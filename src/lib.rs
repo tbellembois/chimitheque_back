@@ -1,7 +1,12 @@
+pub mod appstate;
 pub mod errors;
 pub mod handlers;
 pub mod utils;
 
+use crate::{
+    appstate::AppState, errors::AppError, handlers::store_location::get_store_locations,
+    utils::get_chimitheque_person_id_from_headers,
+};
 use axum::{
     Router,
     error_handling::HandleErrorLayer,
@@ -15,11 +20,9 @@ use axum_oidc::{
     EmptyAdditionalClaims, OidcAuthLayer, OidcClaims, OidcLoginLayer, OidcRpInitiatedLogout,
     error::MiddlewareError,
 };
-use casbin::{
-    CoreApi, DefaultModel, Enforcer, StringAdapter, function_map::OperatorFunction, rhai::Dynamic,
-};
+use casbin::{CoreApi, DefaultModel, Enforcer, StringAdapter};
 use chimitheque_db::{
-    casbin::{match_product_has_storages, match_store_location_is_in_entity, to_string_adapter},
+    casbin::to_string_adapter,
     init::{init_db, update_ghs_statements},
     person::get_people,
 };
@@ -27,7 +30,7 @@ use chimitheque_types::requestfilter::RequestFilter;
 use chrono::Local;
 use http::Method;
 use log::debug;
-use r2d2::{self, Pool};
+use r2d2::{self};
 use r2d2_sqlite::SqliteConnectionManager;
 use std::{
     env,
@@ -43,65 +46,6 @@ use tower_sessions::{
     cookie::{SameSite, time::Duration},
 };
 use url::Url;
-
-use crate::{
-    errors::AppError, handlers::store_location::get_store_locations,
-    utils::get_chimitheque_person_id_from_headers,
-};
-
-#[derive(Clone)]
-pub struct AppState {
-    db_connection_pool: Arc<Pool<SqliteConnectionManager>>,
-    casbin_enforcer: Arc<Mutex<Enforcer>>,
-}
-
-impl AppState {
-    fn set_enforcer(&mut self) {
-        let db_connection_pool_1 = self.db_connection_pool.clone();
-        let db_connection_pool_2 = db_connection_pool_1.clone();
-
-        if let Ok(mut e) = self.casbin_enforcer.lock() {
-            e.add_function(
-                "matchProductHasStorages",
-                OperatorFunction::Arg1Closure(Arc::new(move |product_id: Dynamic| {
-                    let product_id: u64 = product_id.as_int().unwrap_or(0) as u64;
-
-                    // TODO: manage errors.
-                    let db_connection = db_connection_pool_1.get().unwrap();
-
-                    // TODO: manage errors.
-                    let result = match_product_has_storages(db_connection.deref(), product_id)
-                        .unwrap_or_default();
-
-                    result.into()
-                })),
-            );
-
-            e.add_function(
-                "matchStoreLocationIsInEntity",
-                OperatorFunction::Arg2Closure(Arc::new(
-                    move |store_location_id: Dynamic, entity_id: Dynamic| {
-                        let store_location_id: u64 = store_location_id.as_int().unwrap_or(0) as u64;
-                        let entity_id: u64 = entity_id.as_int().unwrap_or(0) as u64;
-
-                        // TODO: manage errors.
-                        let db_connection = db_connection_pool_2.get().unwrap();
-
-                        // TODO: manage errors.
-                        let result = match_store_location_is_in_entity(
-                            db_connection.deref(),
-                            store_location_id,
-                            entity_id,
-                        )
-                        .unwrap_or_default();
-
-                        result.into()
-                    },
-                )),
-            );
-        };
-    }
-}
 
 // Extract OIDC claims from the request.
 // Insert the authenticated user id and email into the request headers.
