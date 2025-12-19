@@ -4,7 +4,12 @@ pub mod handlers;
 pub mod utils;
 
 use crate::{
-    appstate::AppState, errors::AppError, handlers::store_location::get_store_locations,
+    appstate::AppState,
+    errors::AppError,
+    handlers::person::{create_update_person, delete_person, get_people},
+    handlers::store_location::{
+        create_update_store_location, delete_store_location, get_store_locations,
+    },
     utils::get_chimitheque_person_id_from_headers,
 };
 use axum::{
@@ -14,7 +19,7 @@ use axum::{
     http::{HeaderMap, Uri},
     middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{delete, get, post, put},
 };
 use axum_oidc::{
     EmptyAdditionalClaims, OidcAuthLayer, OidcClaims, OidcLoginLayer, OidcRpInitiatedLogout,
@@ -24,7 +29,6 @@ use casbin::{CoreApi, DefaultModel, Enforcer, StringAdapter};
 use chimitheque_db::{
     casbin::to_string_adapter,
     init::{init_db, update_ghs_statements},
-    person::get_people,
 };
 use chimitheque_types::requestfilter::RequestFilter;
 use chrono::Local;
@@ -73,7 +77,7 @@ async fn authenticate_middleware(
     let person_email = claims_email.to_string();
 
     // Get the person from the database.
-    let (people, _) = match get_people(
+    let (people, _) = match chimitheque_db::person::get_people(
         db_connection.deref(),
         RequestFilter {
             person_email: Some(person_email),
@@ -298,11 +302,29 @@ pub async fn run(
     //        |
     //        v
     //     responses
+    //
+    //
+    //
+    // router.Handle("/{item:store_locations}/{id}", secureChain.Then(env.AppMiddleware(env.UpdateStoreLocationHandler))).Methods("PUT")
+    // router.Handle("/{item:store_locations}", secureChain.Then(env.AppMiddleware(env.CreateStoreLocationHandler))).Methods("POST")
+    // router.Handle("/{item:store_locations}/{id}", secureChain.Then(env.AppMiddleware(env.DeleteStoreLocationHandler))).Methods("DELETE")
+
     let app = Router::new()
         .route("/foo", get(authenticated))
         .route("/logout", get(logout))
+        //
         .route("/store_locations", get(get_store_locations))
         .route("/store_locations/{id}", get(get_store_locations))
+        .route("/store_locations/{id}", put(create_update_store_location))
+        .route("/store_locations", post(create_update_store_location))
+        .route("/store_locations/{id}", delete(delete_store_location))
+        //
+        .route("/people", get(get_people))
+        .route("/people/{id}", get(get_people))
+        .route("/people/{id}", put(create_update_person))
+        .route("/people", post(create_update_person))
+        .route("/people/{id}", delete(delete_person))
+        //
         .layer(middleware::from_fn_with_state(
             state.clone(),
             authorize_middleware,
