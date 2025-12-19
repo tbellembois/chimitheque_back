@@ -6,9 +6,12 @@ pub mod utils;
 use crate::{
     appstate::AppState,
     errors::AppError,
-    handlers::person::{create_update_person, delete_person, get_people},
-    handlers::store_location::{
-        create_update_store_location, delete_store_location, get_store_locations,
+    handlers::{
+        entity::{create_update_entity, delete_entity, get_entities, get_entity_stock},
+        person::{create_update_person, delete_person, get_people},
+        store_location::{
+            create_update_store_location, delete_store_location, get_store_locations,
+        },
     },
     utils::get_chimitheque_person_id_from_headers,
 };
@@ -302,12 +305,6 @@ pub async fn run(
     //        |
     //        v
     //     responses
-    //
-    //
-    //
-    // router.Handle("/{item:store_locations}/{id}", secureChain.Then(env.AppMiddleware(env.UpdateStoreLocationHandler))).Methods("PUT")
-    // router.Handle("/{item:store_locations}", secureChain.Then(env.AppMiddleware(env.CreateStoreLocationHandler))).Methods("POST")
-    // router.Handle("/{item:store_locations}/{id}", secureChain.Then(env.AppMiddleware(env.DeleteStoreLocationHandler))).Methods("DELETE")
 
     let app = Router::new()
         .route("/foo", get(authenticated))
@@ -324,6 +321,14 @@ pub async fn run(
         .route("/people/{id}", put(create_update_person))
         .route("/people", post(create_update_person))
         .route("/people/{id}", delete(delete_person))
+        //
+        .route("/entities", get(get_entities))
+        .route("/entities/{id}", get(get_entities))
+        .route("/entities/{id}", put(create_update_entity))
+        .route("/entities", post(create_update_entity))
+        .route("/entities/{id}", delete(delete_entity))
+        //
+        .route("/stocks/{id}", get(get_entity_stock))
         //
         .layer(middleware::from_fn_with_state(
             state.clone(),
