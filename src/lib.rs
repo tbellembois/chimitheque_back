@@ -9,6 +9,7 @@ use crate::{
     handlers::{
         entity::{create_update_entity, delete_entity, get_entities, get_entity_stock},
         person::{create_update_person, delete_person, get_people},
+        product::{create_update_product, delete_product, export_products, get_products},
         store_location::{
             create_update_store_location, delete_store_location, get_store_locations,
         },
@@ -307,7 +308,7 @@ pub async fn run(
     //     responses
 
     let app = Router::new()
-        .route("/foo", get(authenticated))
+        .route("/authenticated", get(authenticated))
         .route("/logout", get(logout))
         //
         .route("/store_locations", get(get_store_locations))
@@ -330,6 +331,13 @@ pub async fn run(
         //
         .route("/stocks/{id}", get(get_entity_stock))
         //
+        .route("/products", get(get_products))
+        .route("/products/{id}", get(get_products))
+        .route("/products/{id}", put(create_update_product))
+        .route("/products", post(create_update_product))
+        .route("/products/{id}", delete(delete_product))
+        .route("/products/export", get(export_products))
+        //
         .layer(middleware::from_fn_with_state(
             state.clone(),
             authorize_middleware,
@@ -340,7 +348,7 @@ pub async fn run(
         ))
         // .route_layer(middleware::from_fn(authenticate_middleware))
         .layer(oidc_login_service)
-        .route("/bar", get(maybe_authenticated))
+        .route("/maybe_authenticated", get(maybe_authenticated))
         .layer(oidc_auth_service)
         .layer(session_layer)
         .with_state(state);
