@@ -10,6 +10,13 @@ use crate::{
         entity::{create_update_entity, delete_entity, get_entities, get_entity_stock},
         person::{create_update_person, delete_person, get_people},
         product::{create_update_product, delete_product, export_products, get_products},
+        searchable::{
+            create_producer, create_supplier, get_cas_numbers, get_categories, get_ce_numbers,
+            get_classes_of_compounds, get_empirical_formulas, get_hazard_statements,
+            get_linear_formulas, get_names, get_physical_states, get_precautionary_statements,
+            get_producer_refs, get_producers, get_signal_words, get_supplier_refs, get_suppliers,
+            get_symbols, get_tags,
+        },
         store_location::{
             create_update_store_location, delete_store_location, get_store_locations,
         },
@@ -337,6 +344,29 @@ pub async fn run(
         .route("/products", post(create_update_product))
         .route("/products/{id}", delete(delete_product))
         .route("/products/export", get(export_products))
+        //
+        .route("/casnumbers", get(get_cas_numbers))
+        .route("/cenumbers", get(get_ce_numbers))
+        .route("/names", get(get_names))
+        .route("/linearformulas", get(get_linear_formulas))
+        .route("/empiricalformulas", get(get_empirical_formulas))
+        .route("/physicalstates", get(get_physical_states))
+        .route("/signalwords", get(get_signal_words))
+        .route("/symbols", get(get_symbols))
+        .route("/classesofcompounds", get(get_classes_of_compounds))
+        .route("/hazardstatements", get(get_hazard_statements))
+        .route(
+            "/precautionarystatements",
+            get(get_precautionary_statements),
+        )
+        .route("/categories", get(get_categories))
+        .route("/tags", get(get_tags))
+        .route("/producers", get(get_producers))
+        .route("/producerrefs", get(get_producer_refs))
+        .route("/suppliers", get(get_suppliers))
+        .route("/supplierrefs", get(get_supplier_refs))
+        .route("/producers", post(create_producer))
+        .route("/suppliers", post(create_supplier))
         //
         .layer(middleware::from_fn_with_state(
             state.clone(),

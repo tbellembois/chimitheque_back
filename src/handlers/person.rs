@@ -4,6 +4,7 @@ use axum::{
     http::HeaderMap,
 };
 use chimitheque_types::{person::Person, requestfilter::RequestFilter};
+use chimitheque_utils::string::{Transform, clean};
 use std::ops::{Deref, DerefMut};
 
 use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
@@ -43,8 +44,13 @@ pub async fn create_update_person(
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
 
-    let mayerr_person_id =
-        chimitheque_db::person::create_update_person(db_connection.deref_mut(), person);
+    // Sanitize and validate the person.
+    let mut sanitized_and_validated_person = person.clone().sanitize_and_validate()?;
+
+    let mayerr_person_id = chimitheque_db::person::create_update_person(
+        db_connection.deref_mut(),
+        sanitized_and_validated_person,
+    );
 
     match mayerr_person_id {
         Ok(person_id) => Ok(Json(person_id)),

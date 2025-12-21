@@ -12,6 +12,8 @@ pub enum AppError {
     MissingEmailInClaims,
     #[error("parse URI: {0}")]
     ParseURI(String),
+    #[error("parse email: {0}")]
+    ParseEmail(String),
     #[error("database: {0}")]
     Database(String),
     #[error("invalid first path segment: {0:?}")]
@@ -26,6 +28,10 @@ pub enum AppError {
     CasbinError(String),
     #[error("casbin enforcer lock failed: {0}")]
     CasbinEnforcerLockFailed(String),
+    #[error("invalid person: {0}")]
+    InvalidPerson(String),
+    #[error("invalid product: {0}")]
+    InvalidProduct(String),
 }
 
 impl IntoResponse for AppError {
@@ -40,6 +46,9 @@ impl IntoResponse for AppError {
                 AppError::MissingEmailInClaims.to_string(),
             ),
             AppError::ParseURI(s) => (StatusCode::BAD_REQUEST, AppError::ParseURI(s).to_string()),
+            AppError::ParseEmail(s) => {
+                (StatusCode::BAD_REQUEST, AppError::ParseEmail(s).to_string())
+            }
             AppError::Database(s) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 AppError::Database(s).to_string(),
@@ -67,6 +76,14 @@ impl IntoResponse for AppError {
             AppError::CasbinEnforcerLockFailed(s) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 AppError::CasbinEnforcerLockFailed(s).to_string(),
+            ),
+            AppError::InvalidPerson(s) => (
+                StatusCode::BAD_REQUEST,
+                AppError::InvalidPerson(s).to_string(),
+            ),
+            AppError::InvalidProduct(s) => (
+                StatusCode::BAD_REQUEST,
+                AppError::InvalidProduct(s).to_string(),
             ),
         };
         (status, body).into_response()
