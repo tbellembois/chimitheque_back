@@ -10,6 +10,7 @@ use crate::{
         entity::{create_update_entity, delete_entity, get_entities, get_entity_stock},
         person::{create_update_person, delete_person, get_people},
         product::{create_update_product, delete_product, export_products, get_products},
+        pubchem::{pubchem_autocomplete, pubchem_getcompoundbyname, pubchem_getproductbyname},
         searchable::{
             create_producer, create_supplier, get_cas_numbers, get_categories, get_ce_numbers,
             get_classes_of_compounds, get_empirical_formulas, get_hazard_statements,
@@ -43,12 +44,14 @@ use chimitheque_db::{
 };
 use chimitheque_types::requestfilter::RequestFilter;
 use chrono::Local;
+use governor::{Quota, RateLimiter};
 use http::Method;
 use log::debug;
 use r2d2::{self};
 use r2d2_sqlite::SqliteConnectionManager;
 use std::{
     env,
+    num::NonZeroU32,
     ops::{Deref, DerefMut},
     path::Path,
     sync::{Arc, Mutex},
@@ -291,9 +294,13 @@ pub async fn run(
         Enforcer::new(casbin_model, casbin_adapter).await.unwrap(),
     ));
 
+    // Initialize rate limiter for pubchem requests.
+    let rate_limiter = RateLimiter::direct(Quota::per_second(NonZeroU32::new(5).unwrap()));
+
     let mut state = AppState {
         casbin_enforcer,
         db_connection_pool: Arc::new(db_connection_pool),
+        rate_limiter: Arc::new(rate_limiter),
     };
 
     state.set_enforcer();
@@ -345,28 +352,41 @@ pub async fn run(
         .route("/products/{id}", delete(delete_product))
         .route("/products/export", get(export_products))
         //
-        .route("/casnumbers", get(get_cas_numbers))
-        .route("/cenumbers", get(get_ce_numbers))
-        .route("/names", get(get_names))
-        .route("/linearformulas", get(get_linear_formulas))
-        .route("/empiricalformulas", get(get_empirical_formulas))
-        .route("/physicalstates", get(get_physical_states))
-        .route("/signalwords", get(get_signal_words))
-        .route("/symbols", get(get_symbols))
-        .route("/classesofcompounds", get(get_classes_of_compounds))
-        .route("/hazardstatements", get(get_hazard_statements))
+        .route("/pubchemautocomplete/{name}", get(pubchem_autocomplete))
         .route(
-            "/precautionarystatements",
+            "/pubchemgetcompoundbyname/{name}",
+            get(pubchem_getcompoundbyname),
+        )
+        .route(
+            "/pubchemgetproductbyname/{name}",
+            get(pubchem_getproductbyname),
+        )
+        //
+        .route("/products/casnumbers", get(get_cas_numbers))
+        .route("/products/cenumbers", get(get_ce_numbers))
+        .route("/products/names", get(get_names))
+        .route("/products/linearformulas", get(get_linear_formulas))
+        .route("/products/empiricalformulas", get(get_empirical_formulas))
+        .route("/products/physicalstates", get(get_physical_states))
+        .route("/products/signalwords", get(get_signal_words))
+        .route("/products/symbols", get(get_symbols))
+        .route(
+            "/products/classesofcompounds",
+            get(get_classes_of_compounds),
+        )
+        .route("/products/hazardstatements", get(get_hazard_statements))
+        .route(
+            "/products/precautionarystatements",
             get(get_precautionary_statements),
         )
-        .route("/categories", get(get_categories))
-        .route("/tags", get(get_tags))
-        .route("/producers", get(get_producers))
-        .route("/producerrefs", get(get_producer_refs))
-        .route("/suppliers", get(get_suppliers))
-        .route("/supplierrefs", get(get_supplier_refs))
-        .route("/producers", post(create_producer))
-        .route("/suppliers", post(create_supplier))
+        .route("/products/categories", get(get_categories))
+        .route("/products/tags", get(get_tags))
+        .route("/products/producers", get(get_producers))
+        .route("/products/producerrefs", get(get_producer_refs))
+        .route("/products/suppliers", get(get_suppliers))
+        .route("/products/supplierrefs", get(get_supplier_refs))
+        .route("/products/producers", post(create_producer))
+        .route("/products/suppliers", post(create_supplier))
         //
         .layer(middleware::from_fn_with_state(
             state.clone(),

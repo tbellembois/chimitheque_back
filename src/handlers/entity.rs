@@ -4,7 +4,6 @@ use axum::{
     http::HeaderMap,
 };
 use chimitheque_types::{entity::Entity, requestfilter::RequestFilter, stock::Stock};
-use chimitheque_utils::string::{Transform, clean};
 use std::ops::{Deref, DerefMut};
 
 use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
@@ -45,12 +44,13 @@ pub async fn create_update_entity(
     let mut db_connection = db_connection_pool.get().unwrap();
 
     // Sanitize and validate the entity.
-    let mut sanitized_and_validated_entity = entity.clone().sanitize_and_validate()?;
+    let mut entity = entity.clone();
+    if let Err(err) = entity.sanitize_and_validate() {
+        return Err(AppError::InputValidation(err.to_string()));
+    };
 
-    let mayerr_entity_id = chimitheque_db::entity::create_update_entity(
-        db_connection.deref_mut(),
-        sanitized_and_validated_entity,
-    );
+    let mayerr_entity_id =
+        chimitheque_db::entity::create_update_entity(db_connection.deref_mut(), entity);
 
     match mayerr_entity_id {
         Ok(entity_id) => Ok(Json(entity_id)),

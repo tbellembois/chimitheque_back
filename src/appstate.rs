@@ -5,6 +5,12 @@ use chimitheque_db::casbin::{
     match_store_location_has_children, match_store_location_has_storages,
     match_store_location_is_in_entity,
 };
+use governor::{
+    RateLimiter,
+    clock::QuantaClock,
+    middleware::NoOpMiddleware,
+    state::{InMemoryState, NotKeyed},
+};
 use log::error;
 use r2d2::{self, Pool};
 use r2d2_sqlite::SqliteConnectionManager;
@@ -17,6 +23,7 @@ use std::{
 pub struct AppState {
     pub db_connection_pool: Arc<Pool<SqliteConnectionManager>>,
     pub casbin_enforcer: Arc<Mutex<Enforcer>>,
+    pub rate_limiter: Arc<RateLimiter<NotKeyed, InMemoryState, QuantaClock, NoOpMiddleware>>,
 }
 
 impl AppState {

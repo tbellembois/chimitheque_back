@@ -32,6 +32,10 @@ pub enum AppError {
     InvalidPerson(String),
     #[error("invalid product: {0}")]
     InvalidProduct(String),
+    #[error("input validation error: {0}")]
+    InputValidation(String),
+    #[error("pubchem error: {0}")]
+    Pubchem(String),
 }
 
 impl IntoResponse for AppError {
@@ -84,6 +88,14 @@ impl IntoResponse for AppError {
             AppError::InvalidProduct(s) => (
                 StatusCode::BAD_REQUEST,
                 AppError::InvalidProduct(s).to_string(),
+            ),
+            AppError::InputValidation(s) => (
+                StatusCode::BAD_REQUEST,
+                AppError::InputValidation(s).to_string(),
+            ),
+            AppError::Pubchem(s) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                AppError::Pubchem(s).to_string(),
             ),
         };
         (status, body).into_response()

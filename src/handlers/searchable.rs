@@ -11,7 +11,7 @@ use chimitheque_types::{
     requestfilter::RequestFilter, signalword::SignalWord, supplier::Supplier,
     supplierref::SupplierRef, symbol::Symbol, tag::Tag,
 };
-use chimitheque_utils::string::{Transform, clean};
+use chimitheque_utils::string::Transform;
 use serde::Serialize;
 
 use crate::{appstate::AppState, errors::AppError};
@@ -353,7 +353,10 @@ pub async fn create_producer(
     let db_connection = db_connection_pool.get().unwrap();
 
     // Sanitize and validate the producer.
-    let mut sanitized_and_validated_producer = producer.clone().sanitize_and_validate();
+    let mut producer = producer.clone();
+    if let Err(err) = producer.sanitize_and_validate() {
+        return Err(AppError::InputValidation(err.to_string()));
+    };
 
     match chimitheque_db::searchable::create_update(
         &Producer {
@@ -361,7 +364,7 @@ pub async fn create_producer(
         },
         None,
         &db_connection,
-        &sanitized_and_validated_producer.producer_label,
+        &producer.producer_label,
         Transform::None,
     ) {
         Ok(producer_id) => Ok(Json(producer_id)),
@@ -378,7 +381,10 @@ pub async fn create_supplier(
     let db_connection = db_connection_pool.get().unwrap();
 
     // Sanitize and validate the supplier.
-    let mut sanitized_and_validated_supplier = supplier.clone().sanitize_and_validate()?;
+    let mut supplier = supplier.clone();
+    if let Err(err) = supplier.sanitize_and_validate() {
+        return Err(AppError::InputValidation(err.to_string()));
+    };
 
     match chimitheque_db::searchable::create_update(
         &Supplier {
@@ -386,7 +392,7 @@ pub async fn create_supplier(
         },
         None,
         &db_connection,
-        &sanitized_and_validated_supplier.supplier_label,
+        &supplier.supplier_label,
         Transform::None,
     ) {
         Ok(supplier_id) => Ok(Json(supplier_id)),

@@ -4,7 +4,6 @@ use axum::{
     http::HeaderMap,
 };
 use chimitheque_types::{requestfilter::RequestFilter, storelocation::StoreLocation};
-use chimitheque_utils::string::{Transform, clean};
 use std::ops::{Deref, DerefMut};
 
 use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
@@ -45,11 +44,14 @@ pub async fn create_update_store_location(
     let mut db_connection = db_connection_pool.get().unwrap();
 
     // Sanitize and validate the store location..
-    let mut sanitized_and_validated_store_location = store_location.clone().sanitize_and_validate();
+    let mut store_location = store_location.clone();
+    if let Err(err) = store_location.sanitize_and_validate() {
+        return Err(AppError::InputValidation(err.to_string()));
+    };
 
     let mayerr_store_location_id = chimitheque_db::storelocation::create_update_store_location(
         db_connection.deref_mut(),
-        sanitized_and_validated_store_location,
+        store_location,
     );
 
     match mayerr_store_location_id {
