@@ -7,16 +7,25 @@ use crate::{
     appstate::AppState,
     errors::AppError,
     handlers::{
+        bookmark::toogle_bookmark,
+        borrowing::toogle_borrowing,
         entity::{create_update_entity, delete_entity, get_entities, get_entity_stock},
         person::{create_update_person, delete_person, get_people},
         product::{create_update_product, delete_product, export_products, get_products},
-        pubchem::{pubchem_autocomplete, pubchem_getcompoundbyname, pubchem_getproductbyname},
+        pubchem::{
+            pubchem_autocomplete, pubchem_create_update_product, pubchem_getcompoundbyname,
+            pubchem_getproductbyname,
+        },
         searchable::{
             create_producer, create_supplier, get_cas_numbers, get_categories, get_ce_numbers,
             get_classes_of_compounds, get_empirical_formulas, get_hazard_statements,
             get_linear_formulas, get_names, get_physical_states, get_precautionary_statements,
             get_producer_refs, get_producers, get_signal_words, get_supplier_refs, get_suppliers,
             get_symbols, get_tags,
+        },
+        storage::{
+            archive_storage, create_update_storage, delete_storage, export_storages, get_storages,
+            unarchive_storage,
         },
         store_location::{
             create_update_store_location, delete_store_location, get_store_locations,
@@ -352,6 +361,15 @@ pub async fn run(
         .route("/products/{id}", delete(delete_product))
         .route("/products/export", get(export_products))
         //
+        .route("/storages", get(get_storages))
+        .route("/storages/{id}", get(get_storages))
+        .route("/storages/{id}", put(create_update_storage))
+        .route("/storages", post(create_update_storage))
+        .route("/storages/{id}", delete(delete_storage))
+        .route("/storages/export", get(export_storages))
+        .route("/storages/{id}/archive", delete(archive_storage))
+        .route("/storages/{id}/unarchive", put(unarchive_storage))
+        //
         .route("/pubchemautocomplete/{name}", get(pubchem_autocomplete))
         .route(
             "/pubchemgetcompoundbyname/{name}",
@@ -361,6 +379,8 @@ pub async fn run(
             "/pubchemgetproductbyname/{name}",
             get(pubchem_getproductbyname),
         )
+        .route("/pubchemproduct", post(pubchem_create_update_product))
+        .route("/pubchemproduct/{id}", post(pubchem_create_update_product))
         //
         .route("/products/casnumbers", get(get_cas_numbers))
         .route("/products/cenumbers", get(get_ce_numbers))
@@ -387,6 +407,10 @@ pub async fn run(
         .route("/products/supplierrefs", get(get_supplier_refs))
         .route("/products/producers", post(create_producer))
         .route("/products/suppliers", post(create_supplier))
+        //
+        .route("/bookmarks/{id}", get(toogle_bookmark))
+        //
+        .route("/borrows/{id}", get(toogle_borrowing))
         //
         .layer(middleware::from_fn_with_state(
             state.clone(),

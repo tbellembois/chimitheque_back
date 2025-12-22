@@ -1,6 +1,9 @@
+pub mod bookmark;
+pub mod borrowing;
 pub mod entity;
 pub mod person;
 pub mod product;
 pub mod pubchem;
 pub mod searchable;
+pub mod storage;
 pub mod store_location;
