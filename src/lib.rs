@@ -30,7 +30,9 @@ use crate::{
         store_location::{
             create_update_store_location, delete_store_location, get_store_locations,
         },
-        validate::{validate_cas_number, validate_ce_number, validate_empirical_formula},
+        validate::{
+            validate_cas_number, validate_ce_number, validate_email, validate_empirical_formula,
+        },
     },
     utils::get_chimitheque_person_id_from_headers,
 };
@@ -332,7 +334,9 @@ pub async fn run(
     //     responses
 
     let app = Router::new()
+        // unused endpoint
         .route("/authenticated", get(authenticated))
+        //
         .route("/logout", get(logout))
         //
         .route("/store_locations", get(get_store_locations))
@@ -413,6 +417,7 @@ pub async fn run(
         //
         .route("/borrows/{id}", get(toogle_borrowing))
         //
+        .route("/validate/email/{email}", get(validate_email))
         .route("/validate/casnumber/{cas_number}", get(validate_cas_number))
         .route("/validate/cenumber/{ce_number}", get(validate_ce_number))
         .route(
@@ -430,6 +435,7 @@ pub async fn run(
         ))
         // .route_layer(middleware::from_fn(authenticate_middleware))
         .layer(oidc_login_service)
+        // unused endpoint
         .route("/maybe_authenticated", get(maybe_authenticated))
         .layer(oidc_auth_service)
         .layer(session_layer)

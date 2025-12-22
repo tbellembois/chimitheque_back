@@ -1,6 +1,7 @@
 pub mod bookmark;
 pub mod borrowing;
 pub mod entity;
+pub mod fake;
 pub mod person;
 pub mod product;
 pub mod pubchem;
