@@ -7,3 +7,4 @@ pub mod pubchem;
 pub mod searchable;
 pub mod storage;
 pub mod store_location;
+pub mod validate;

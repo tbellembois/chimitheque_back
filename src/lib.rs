@@ -30,6 +30,7 @@ use crate::{
         store_location::{
             create_update_store_location, delete_store_location, get_store_locations,
         },
+        validate::{validate_cas_number, validate_ce_number, validate_empirical_formula},
     },
     utils::get_chimitheque_person_id_from_headers,
 };
@@ -411,6 +412,13 @@ pub async fn run(
         .route("/bookmarks/{id}", get(toogle_bookmark))
         //
         .route("/borrows/{id}", get(toogle_borrowing))
+        //
+        .route("/validate/casnumber/{cas_number}", get(validate_cas_number))
+        .route("/validate/cenumber/{ce_number}", get(validate_ce_number))
+        .route(
+            "/validate/casnumber/{empirical_formula}",
+            get(validate_empirical_formula),
+        )
         //
         .layer(middleware::from_fn_with_state(
             state.clone(),
