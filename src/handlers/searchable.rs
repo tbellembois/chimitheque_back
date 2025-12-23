@@ -1,6 +1,5 @@
-use std::ops::Deref;
-
 use axum::{Json, extract::State};
+use axum_extra::extract::Query;
 use chimitheque_db::searchable::get_many;
 use chimitheque_traits::searchable::Searchable;
 use chimitheque_types::{
@@ -13,12 +12,13 @@ use chimitheque_types::{
 };
 use chimitheque_utils::string::Transform;
 use serde::Serialize;
+use std::ops::Deref;
 
 use crate::{appstate::AppState, errors::AppError};
 
 pub async fn get_cas_numbers(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -38,7 +38,7 @@ pub async fn get_cas_numbers(
 
 pub async fn get_ce_numbers(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -58,7 +58,7 @@ pub async fn get_ce_numbers(
 
 pub async fn get_categories(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -78,7 +78,7 @@ pub async fn get_categories(
 
 pub async fn get_classes_of_compounds(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -98,7 +98,7 @@ pub async fn get_classes_of_compounds(
 
 pub async fn get_empirical_formulas(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -118,7 +118,7 @@ pub async fn get_empirical_formulas(
 
 pub async fn get_linear_formulas(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -138,7 +138,7 @@ pub async fn get_linear_formulas(
 
 pub async fn get_names(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -158,7 +158,7 @@ pub async fn get_names(
 
 pub async fn get_physical_states(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -178,7 +178,7 @@ pub async fn get_physical_states(
 
 pub async fn get_symbols(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -198,7 +198,7 @@ pub async fn get_symbols(
 
 pub async fn get_tags(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -218,7 +218,7 @@ pub async fn get_tags(
 
 pub async fn get_signal_words(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -238,7 +238,7 @@ pub async fn get_signal_words(
 
 pub async fn get_hazard_statements(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -258,7 +258,7 @@ pub async fn get_hazard_statements(
 
 pub async fn get_precautionary_statements(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -278,7 +278,7 @@ pub async fn get_precautionary_statements(
 
 pub async fn get_producers(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -298,7 +298,7 @@ pub async fn get_producers(
 
 pub async fn get_suppliers(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -318,7 +318,7 @@ pub async fn get_suppliers(
 
 pub async fn get_producer_refs(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<ProducerRef>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -332,7 +332,7 @@ pub async fn get_producer_refs(
 
 pub async fn get_supplier_refs(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<SupplierRef>, usize)>, AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();

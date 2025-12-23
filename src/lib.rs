@@ -62,6 +62,7 @@ use http::Method;
 use log::debug;
 use r2d2::{self};
 use r2d2_sqlite::SqliteConnectionManager;
+use rusqlite::Connection;
 use std::{
     env,
     num::NonZeroU32,
@@ -169,7 +170,12 @@ async fn authorize_middleware(
     // Get the request URI.
     let request_uri = request.uri();
     // Adding a fake host required by the parse function below.
-    let request_full = format!("http://localhost{}", request_uri.path());
+    let request_full = format!(
+        "http://localhost{}",
+        request_uri.path().trim_start_matches("/f")
+    );
+
+    debug!("request_full: {}", request_full);
 
     // Parse the request URI.
     let mayerr_parsed_uri = Url::parse(&request_full);
@@ -188,19 +194,34 @@ async fn authorize_middleware(
         return AppError::InvalidFirstPathSegment(maybe_first_segment).into_response();
     };
 
-    // Check that the first path segment is expected.
-    if ![String::from("store_locations")].contains(&item) {
-        return AppError::InvalidFirstPathSegment(Some(item)).into_response();
-    };
-
     debug!("chimitheque_person_id: {}", chimitheque_person_id);
     debug!("request_action: {}", request_action);
     debug!("item: {}", item);
     debug!("item_id: {}", item_id);
 
-    // Get the casbin enforcer from the state object.
-    // TODO: https://github.com/tokio-rs/axum/discussions/2458
+    // Check the protected endpoints.
+    if [
+        String::from("authenticated"),
+        String::from("logout"),
+        String::from("store_locations"),
+        String::from("people"),
+        String::from("entities"),
+        String::from("stocks"),
+        String::from("products"),
+        String::from("storages"),
+        String::from("pubchemautocomplete"),
+        String::from("pubchemgetcompoundbyname"),
+        String::from("pubchemgetproductbyname"),
+        String::from("pubchemproduct"),
+        String::from("bookmarks"),
+        String::from("borrows"),
+        String::from("validate"),
+        String::from("maybe_authenticated"),
+    ]
+    .contains(&item)
     {
+        // Get the casbin enforcer from the state object.
+        // TODO: https://github.com/tokio-rs/axum/discussions/2458
         let casbin_enforcer = state.casbin_enforcer;
 
         // Then check the permissions.
@@ -208,9 +229,21 @@ async fn authorize_middleware(
             Ok(enforcer) => enforcer,
             Err(err) => return AppError::CasbinEnforcerLockFailed(err.to_string()).into_response(),
         };
-        match casbin_enforcer.enforce((chimitheque_person_id, request_action, item, item_id)) {
-            Ok(true) => (),
-            Ok(false) => return AppError::PermissionDenied.into_response(),
+
+        match casbin_enforcer.enforce((
+            chimitheque_person_id.to_string(),
+            request_action,
+            item,
+            item_id,
+        )) {
+            Ok(true) => {
+                debug!("authorize_middleware: true");
+            }
+            Ok(false) => {
+                debug!("authorize_middleware: false");
+
+                return AppError::PermissionDenied.into_response();
+            }
             Err(err) => return AppError::CasbinError(err.to_string()).into_response(),
         };
     }
@@ -239,23 +272,28 @@ pub async fn run(
         })
         .init();
 
-    // Load SQLite extensions directory.
-    let sql_extension_dir = env::var("SQLITE_EXTENSION_DIR")
-        .expect("Missing SQLITE_EXTENSION_DIR environment variable.");
-    let sql_extension_regex = Path::new(sql_extension_dir.as_str()).join("regexp.so");
-
     // Create DB pool.
-    let manager = SqliteConnectionManager::file(db_path.clone());
+    let manager =
+        SqliteConnectionManager::file(db_path.clone()).with_init(|conn: &mut Connection| {
+            // Load SQLite extensions directory.
+            let sql_extension_dir = env::var("SQLITE_EXTENSION_DIR")
+                .expect("Missing SQLITE_EXTENSION_DIR environment variable.");
+
+            // Enable extension loading
+            unsafe { conn.load_extension_enable() }?;
+
+            // Load the extension (example path)
+            unsafe { conn.load_extension(format!("{}/{}", sql_extension_dir, "regexp.so"), None) }?;
+
+            // Disable again for safety
+            conn.load_extension_disable()?;
+
+            Ok(())
+        });
     let db_connection_pool = r2d2::Pool::builder().build(manager).unwrap();
 
     // Load extensions.
     let mut db_connection = db_connection_pool.get().unwrap();
-
-    unsafe {
-        db_connection
-            .load_extension(sql_extension_regex, None)
-            .unwrap();
-    }
 
     // Check that DB file exist, create if not.
     if Path::new(&db_path).metadata().unwrap().size() == 0 {
@@ -452,7 +490,7 @@ pub async fn run(
         .route("/validate/casnumber/{cas_number}", get(validate_cas_number))
         .route("/validate/cenumber/{ce_number}", get(validate_ce_number))
         .route(
-            "/validate/casnumber/{empirical_formula}",
+            "/validate/empiricalformula/{empirical_formula}",
             get(validate_empirical_formula),
         )
         //

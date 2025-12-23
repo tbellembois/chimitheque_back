@@ -1,8 +1,5 @@
-use axum::{
-    Json,
-    extract::{Query, State},
-    http::HeaderMap,
-};
+use axum::{Json, extract::State, http::HeaderMap};
+use axum_extra::extract::Query;
 use chimitheque_types::{entity::Entity, requestfilter::RequestFilter, stock::Stock};
 use std::ops::{Deref, DerefMut};
 
@@ -11,7 +8,7 @@ use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_he
 pub async fn get_entities(
     State(state): State<AppState>,
     headers: HeaderMap,
-    request_filter: RequestFilter,
+    Query(request_filter): Query<RequestFilter>,
 ) -> Result<Json<(Vec<Entity>, usize)>, AppError> {
     // Get the chimitheque_entity_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {

@@ -1,9 +1,5 @@
-use std::ops::{Deref, DerefMut};
-
-use axum::{
-    Json,
-    extract::{Query, State},
-};
+use axum::{Json, extract::State};
+use axum_extra::extract::Query;
 use chimitheque_pubchem::{pubchem::get_product_by_name, pubchem_compound::Autocomplete};
 use chimitheque_pubchem::{
     pubchem::{autocomplete, get_compound_by_name},
@@ -11,6 +7,7 @@ use chimitheque_pubchem::{
 };
 use chimitheque_types::pubchemproduct::PubchemProduct;
 use http::HeaderMap;
+use std::ops::{Deref, DerefMut};
 
 use crate::{appstate::AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
 
