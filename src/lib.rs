@@ -10,6 +10,7 @@ use crate::{
         bookmark::toogle_bookmark,
         borrowing::toogle_borrowing,
         entity::{create_update_entity, delete_entity, get_entities, get_entity_stock},
+        fake::fake,
         person::{create_update_person, delete_person, get_people},
         product::{create_update_product, delete_product, export_products, get_products},
         pubchem::{
@@ -345,17 +346,35 @@ pub async fn run(
         .route("/store_locations", post(create_update_store_location))
         .route("/store_locations/{id}", delete(delete_store_location))
         //
+        .route("/f/store_locations", get(fake))
+        .route("/f/store_locations/{id}", get(fake))
+        .route("/f/store_locations/{id}", put(fake))
+        .route("/f/store_locations", post(fake))
+        .route("/f/store_locations/{id}", delete(fake))
+        //
         .route("/people", get(get_people))
         .route("/people/{id}", get(get_people))
         .route("/people/{id}", put(create_update_person))
         .route("/people", post(create_update_person))
         .route("/people/{id}", delete(delete_person))
         //
+        .route("/f/people", get(fake))
+        .route("/f/people/{id}", get(fake))
+        .route("/f/people/{id}", put(fake))
+        .route("/f/people", post(fake))
+        .route("/f/people/{id}", delete(fake))
+        //
         .route("/entities", get(get_entities))
         .route("/entities/{id}", get(get_entities))
         .route("/entities/{id}", put(create_update_entity))
         .route("/entities", post(create_update_entity))
         .route("/entities/{id}", delete(delete_entity))
+        //
+        .route("/f/entities", get(fake))
+        .route("/f/entities/{id}", get(fake))
+        .route("/f/entities/{id}", put(fake))
+        .route("/f/entities", post(fake))
+        .route("/f/entities/{id}", delete(fake))
         //
         .route("/stocks/{id}", get(get_entity_stock))
         //
@@ -366,6 +385,12 @@ pub async fn run(
         .route("/products/{id}", delete(delete_product))
         .route("/products/export", get(export_products))
         //
+        .route("/f/products", get(fake))
+        .route("/f/products/{id}", get(fake))
+        .route("/f/products/{id}", put(fake))
+        .route("/f/products", post(fake))
+        .route("/f/products/{id}", delete(fake))
+        //
         .route("/storages", get(get_storages))
         .route("/storages/{id}", get(get_storages))
         .route("/storages/{id}", put(create_update_storage))
@@ -374,6 +399,12 @@ pub async fn run(
         .route("/storages/export", get(export_storages))
         .route("/storages/{id}/archive", delete(archive_storage))
         .route("/storages/{id}/unarchive", put(unarchive_storage))
+        //
+        .route("/f/storages", get(fake))
+        .route("/f/storages/{id}", get(fake))
+        .route("/f/storages/{id}", put(fake))
+        .route("/f/storages", post(fake))
+        .route("/f/storages/{id}", delete(fake))
         //
         .route("/pubchemautocomplete/{name}", get(pubchem_autocomplete))
         .route(
