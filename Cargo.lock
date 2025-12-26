@@ -622,6 +622,7 @@ dependencies = [
  "env_logger 0.11.8",
  "governor",
  "http 1.4.0",
+ "lazy_static",
  "log",
  "r2d2",
  "r2d2_sqlite",
@@ -631,6 +632,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tower",
+ "tower-http",
  "tower-sessions",
  "url",
 ]
@@ -4185,6 +4187,20 @@ dependencies = [
  "futures-util",
  "http 1.4.0",
  "parking_lot",
+ "pin-project-lite",
+ "tower-layer",
+ "tower-service",
+]
+
+[[package]]
+name = "tower-http"
+version = "0.6.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4e6559d53cc268e5031cd8429d05415bc4cb4aefc4aa5d6cc35fbf5b924a1f8"
+dependencies = [
+ "bitflags 2.10.0",
+ "bytes",
+ "http 1.4.0",
  "pin-project-lite",
  "tower-layer",
  "tower-service",

@@ -13,9 +13,11 @@ chrono = "0.4.42"
 dotenvy = "0.15"
 env_logger = "0.11.8"
 governor = "0.10.1"
+lazy_static = "1.5.0"
 log = "0.4.28"
 tokio = { version = "1.10.0", features = ["fs", "io-util", "rt-multi-thread"] }
 tower = "0.5"
+tower-http = { version = "0.6", features = ["cors"] }
 tower-sessions = "0.14"
 thiserror = "2.0.17"
 rusqlite = { version = "0.31.0", features = ["load_extension", "bundled"] }

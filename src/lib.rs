@@ -11,7 +11,7 @@ use crate::{
         borrowing::toogle_borrowing,
         entity::{create_update_entity, delete_entity, get_entities, get_entity_stock},
         fake::fake,
-        person::{create_update_person, delete_person, get_people},
+        person::{create_update_person, delete_person, get_connected_user, get_people},
         product::{create_update_product, delete_product, export_products, get_products},
         pubchem::{
             pubchem_autocomplete, pubchem_create_update_product, pubchem_getcompoundbyname,
@@ -43,7 +43,7 @@ use axum::{
     extract::{Request, State},
     http::{HeaderMap, Uri},
     middleware::{self, Next},
-    response::{IntoResponse, Response},
+    response::{IntoResponse, Redirect, Response},
     routing::{delete, get, post, put},
 };
 use axum_oidc::{
@@ -59,6 +59,7 @@ use chimitheque_types::requestfilter::RequestFilter;
 use chrono::Local;
 use governor::{Quota, RateLimiter};
 use http::Method;
+use lazy_static::lazy_static;
 use log::debug;
 use r2d2::{self};
 use r2d2_sqlite::SqliteConnectionManager;
@@ -73,6 +74,7 @@ use std::{
 use std::{io::Write, os::unix::fs::MetadataExt};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
+use tower_http::cors::{Any, CorsLayer};
 use tower_sessions::{
     Expiry, MemoryStore, SessionManagerLayer,
     cookie::{SameSite, time::Duration},
@@ -201,8 +203,6 @@ async fn authorize_middleware(
 
     // Check the protected endpoints.
     if [
-        String::from("authenticated"),
-        String::from("logout"),
         String::from("store_locations"),
         String::from("people"),
         String::from("entities"),
@@ -215,8 +215,6 @@ async fn authorize_middleware(
         String::from("pubchemproduct"),
         String::from("bookmarks"),
         String::from("borrows"),
-        String::from("validate"),
-        String::from("maybe_authenticated"),
     ]
     .contains(&item)
     {
@@ -251,6 +249,39 @@ async fn authorize_middleware(
     next.run(request).await
 }
 
+// A debug middleware.
+async fn my_middleware(request: Request, next: Next) -> Response {
+    // do something with `request`...
+    let request_headers = request.headers();
+    request_headers.iter().for_each(|header| {
+        println!("request header: {:?} = {:?}", header.0, header.1);
+    });
+
+    let response = next.run(request).await;
+
+    // do something with `response`...
+    let response_headers = response.headers();
+    response_headers.iter().for_each(|header| {
+        println!("response header: {:?} = {:?}", header.0, header.1);
+    });
+
+    response
+}
+
+lazy_static! {
+    static ref chimitheque_full_url: String = {
+        // Load required environment variables.
+        // TODO: remove this with the new frontend.
+        let chimitheque_url =
+            env::var("CHIMITHEQUE_URL").expect("Missing CHIMITHEQUE_URL environment variable.");
+        let chimitheque_path =
+            env::var("CHIMITHEQUE_PATH").expect("Missing CHIMITHEQUE_PATH environment variable.");
+
+
+        format!("{}{}?auth=true", chimitheque_url, chimitheque_path)
+    };
+}
+
 pub async fn run(
     app_url: String,
     db_path: String,
@@ -271,6 +302,8 @@ pub async fn run(
             )
         })
         .init();
+
+    debug!("chimitheque_full_url: {}", chimitheque_full_url.as_str());
 
     // Create DB pool.
     let manager =
@@ -372,11 +405,23 @@ pub async fn run(
     //        v
     //     responses
 
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     let app = Router::new()
-        // unused endpoint
+        //
         .route("/authenticated", get(authenticated))
         //
+        .route("/getconnecteduser", get(get_connected_user))
+        //
         .route("/logout", get(logout))
+        // TODO: remove this route with the new frontend
+        .route(
+            "/login",
+            get(|| async { Redirect::permanent(chimitheque_full_url.as_str()) }),
+        )
         //
         .route("/store_locations", get(get_store_locations))
         .route("/store_locations/{id}", get(get_store_locations))
@@ -502,12 +547,13 @@ pub async fn run(
             state.clone(),
             authenticate_middleware,
         ))
-        // .route_layer(middleware::from_fn(authenticate_middleware))
         .layer(oidc_login_service)
         // unused endpoint
         .route("/maybe_authenticated", get(maybe_authenticated))
         .layer(oidc_auth_service)
         .layer(session_layer)
+        .layer(cors)
+        .layer(middleware::from_fn(my_middleware))
         .with_state(state);
 
     let listener = TcpListener::bind("[::]:8083").await.unwrap();
