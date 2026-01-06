@@ -1,6 +1,7 @@
 use axum::{Json, extract::State, http::HeaderMap};
 use axum_extra::extract::Query;
 use chimitheque_types::{entity::Entity, requestfilter::RequestFilter, stock::Stock};
+use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
 use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
@@ -28,6 +29,42 @@ pub async fn get_entities(
 
     match mayerr_entities {
         Ok(entities) => Ok(Json(entities)),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct GetEntitiesOldResponse {
+    rows: Vec<Entity>,
+    total: usize,
+}
+
+pub async fn get_entities_old(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(request_filter): Query<RequestFilter>,
+) -> Result<Json<GetEntitiesOldResponse>, AppError> {
+    // Get the chimitheque_entity_id.
+    let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
+        Ok(chimitheque_person_id) => chimitheque_person_id,
+        Err(err) => return Err(err),
+    };
+
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    let mayerr_entities = chimitheque_db::entity::get_entities(
+        db_connection.deref(),
+        request_filter,
+        chimitheque_person_id,
+    );
+
+    match mayerr_entities {
+        Ok(entities) => Ok(Json(GetEntitiesOldResponse {
+            rows: entities.0,
+            total: entities.1,
+        })),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }

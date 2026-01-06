@@ -9,7 +9,9 @@ use crate::{
     handlers::{
         bookmark::toogle_bookmark,
         borrowing::toogle_borrowing,
-        entity::{create_update_entity, delete_entity, get_entities, get_entity_stock},
+        entity::{
+            create_update_entity, delete_entity, get_entities, get_entities_old, get_entity_stock,
+        },
         fake::fake,
         person::{create_update_person, delete_person, get_connected_user, get_people},
         product::{create_update_product, delete_product, export_products, get_products},
@@ -38,18 +40,15 @@ use crate::{
     utils::get_chimitheque_person_id_from_headers,
 };
 use axum::{
-    Router,
-    error_handling::HandleErrorLayer,
+    Extension, Json, Router,
     extract::{Request, State},
-    http::{HeaderMap, Uri},
+    http::HeaderMap,
     middleware::{self, Next},
-    response::{IntoResponse, Redirect, Response},
+    response::{IntoResponse, Response},
     routing::{delete, get, post, put},
 };
-use axum_oidc::{
-    EmptyAdditionalClaims, OidcAuthLayer, OidcClaims, OidcLoginLayer, OidcRpInitiatedLogout,
-    error::MiddlewareError,
-};
+use axum_extra::extract::Query;
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use casbin::{CoreApi, DefaultModel, Enforcer, StringAdapter};
 use chimitheque_db::{
     casbin::to_string_adapter,
@@ -57,60 +56,352 @@ use chimitheque_db::{
 };
 use chimitheque_types::requestfilter::RequestFilter;
 use chrono::Local;
+use dashmap::DashMap;
 use governor::{Quota, RateLimiter};
-use http::Method;
-use lazy_static::lazy_static;
-use log::debug;
+use http::{Method, StatusCode};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
+use log::{debug, info};
+use once_cell::sync::OnceCell;
 use r2d2::{self};
 use r2d2_sqlite::SqliteConnectionManager;
+use rand::{Rng, distr::Alphanumeric};
 use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
+    collections::HashMap,
     env,
     num::NonZeroU32,
     ops::{Deref, DerefMut},
     path::Path,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 use std::{io::Write, os::unix::fs::MetadataExt};
 use tokio::net::TcpListener;
-use tower::ServiceBuilder;
+use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
 use tower_sessions::{
     Expiry, MemoryStore, SessionManagerLayer,
     cookie::{SameSite, time::Duration},
 };
+use ureq::{Error, config::Config};
 use url::Url;
+use uuid::Uuid;
+
+#[derive(Debug, Clone)]
+pub struct AuthContext {
+    pub sub: String,   // claims sub
+    pub email: String, // claims email
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct TokenResponse {
+    access_token: String,
+    refresh_token: String,
+    expires_in: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct Claims {
+    email: Option<String>,
+
+    sub: String, // Keycloak user ID (UUID)
+    iss: String, // The iss (issuer) claim identifies the principal that issued the JWT.
+
+    // Keycloak: string OR array
+    #[serde(default)]
+    aud: Option<serde_json::Value>, // A string or array of strings that identifies the recipients that the JWT is intended for.
+}
+
+static JWKS_CACHE: OnceCell<Mutex<JwksCache>> = OnceCell::new();
+
+fn generate_code_verifier() -> String {
+    rand::rng()
+        .sample_iter(&Alphanumeric)
+        .take(64)
+        .map(char::from)
+        .collect()
+}
+
+fn generate_code_challenge(verifier: &str) -> String {
+    let hash = Sha256::digest(verifier.as_bytes());
+    URL_SAFE_NO_PAD.encode(hash)
+}
+
+#[derive(Clone)]
+pub struct AccessToken(pub String);
+
+#[derive(Debug, Deserialize)]
+struct RsaJwk {
+    kty: String,
+    kid: String,
+    r#use: String, // 'use' is reserved
+    alg: String,
+    n: String,
+    e: String,
+}
+
+// Cached JWKS with timestamp.
+#[derive(Debug, Deserialize)]
+struct JwksCache {
+    keys: Vec<RsaJwk>,
+
+    #[serde(skip_deserializing)]
+    #[serde(default = "std::time::Instant::now")]
+    last_updated: std::time::Instant,
+}
+
+// Refresh JWKS from Keycloak
+fn refresh_jwks(http_client: &Arc<ureq::Agent>, keycloak_base_url: String) -> JwksCache {
+    let url = format!(
+        "{}/realms/chimitheque/protocol/openid-connect/certs",
+        keycloak_base_url
+    );
+
+    http_client
+        .get(url)
+        .call()
+        .unwrap()
+        .body_mut()
+        .read_json::<JwksCache>()
+        .unwrap()
+}
+
+pub async fn jwt_middleware(
+    State(state): State<AppState>,
+    Extension(http_client): Extension<Arc<ureq::Agent>>,
+    mut req: Request,
+    next: Next,
+) -> Response {
+    debug!("jwt_middleware");
+
+    // Extract Bearer token.
+    let token = match req
+        .headers()
+        .get("Authorization")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+    {
+        Some(token) => token,
+        None => {
+            return AppError::BearerTokenMissing.into_response();
+        }
+    };
+
+    // Decode header to get kid.
+    let header = match decode_header(token) {
+        Ok(header) => header,
+        Err(err) => return AppError::DecodeJWTHeader(err.to_string()).into_response(),
+    };
+
+    // Extract kid from header.
+    // The kid (key ID) Header Parameter is a hint indicating which key was used to secure the JWS.
+    let kid = match header.kid {
+        Some(kid) => kid,
+        None => return AppError::HeaderKIDMissing.into_response(),
+    };
+
+    // Get JWKS cache
+    // The JSON Web Key Set (JWKS) is a set of keys containing the public keys used to verify any issued by the and signed using the RS256 signing algorithm.
+    let cache = JWKS_CACHE.get_or_init(|| {
+        Mutex::new(JwksCache {
+            keys: refresh_jwks(&http_client, state.keycloak_base_url.clone()).keys,
+            last_updated: std::time::Instant::now(),
+        })
+    });
+
+    let mut jwks_lock = cache.lock().await;
+
+    // Refresh JWKS if older than 10 minutes or kid not found.
+    let kid_found = jwks_lock.keys.iter().any(|k| k.kid == kid);
+    if !kid_found || jwks_lock.last_updated.elapsed() > std::time::Duration::from_secs(600) {
+        jwks_lock.keys = refresh_jwks(&http_client, state.keycloak_base_url.clone()).keys;
+        jwks_lock.last_updated = std::time::Instant::now();
+    }
+
+    // Find key by kid.
+    let rsa_jwk = match jwks_lock.keys.iter().find(|k| k.kid == kid) {
+        Some(jwk) => jwk,
+        None => return AppError::RSAJWKNotFoundInCache(kid).into_response(),
+    };
+
+    // Decode and validate claims, check expected audience.
+    let mut validation = Validation::new(Algorithm::RS256);
+    validation.set_issuer(&[format!("{}/realms/chimitheque", state.keycloak_base_url)]);
+    validation.set_audience(&["chimitheque"]);
+
+    let claims: Claims = match decode::<Claims>(
+        token,
+        &DecodingKey::from_rsa_components(&rsa_jwk.n, &rsa_jwk.e).unwrap(),
+        &validation,
+    ) {
+        Ok(token_data) => token_data.claims,
+        Err(err) => {
+            return AppError::ClaimsDecoding(err.to_string()).into_response();
+        }
+    };
+
+    // Inject username (sub) into request extensions.
+    let user_email = claims.email.unwrap();
+    let auth_context = AuthContext {
+        sub: claims.sub,
+        email: user_email,
+    };
+    req.extensions_mut().insert(auth_context);
+
+    // ✅ Continue to next middleware/handler
+    next.run(req).await
+}
+
+#[derive(Serialize)]
+struct LoginResponse {
+    login_url: String,
+}
+
+// Browser → Keycloak login
+//         → redirect back with ?code=...
+//         → exchange code for tokens
+//         → call API with Bearer token
+// PKCE = one-time, per-authorization-request secret
+// One login attempt → one code_verifier
+// After token exchange → discard it
+async fn login(State(app_state): State<AppState>) -> Json<LoginResponse> {
+    debug!("login");
+
+    let verifier = generate_code_verifier();
+    let challenge = generate_code_challenge(&verifier);
+    let state = Uuid::new_v4().to_string();
+
+    let keycloak_auth_url = format!(
+        "{}/realms/{}/protocol/openid-connect/auth",
+        app_state.keycloak_base_url, app_state.keycloak_realm
+    );
+    let keycloak_client_id = app_state.keycloak_client_id;
+    let keycloak_redirect_url = app_state.keycloak_redirect_url;
+
+    let pkce_store = app_state.pkce_store.lock().await;
+
+    pkce_store.insert(state.clone(), verifier);
+
+    let url = format!(
+        "{auth}?client_id={client}&response_type=code&scope=openid\
+         &redirect_uri={redirect}&code_challenge={challenge}\
+         &code_challenge_method=S256&state={state}",
+        auth = keycloak_auth_url,
+        client = keycloak_client_id,
+        redirect = urlencoding::encode(keycloak_redirect_url.as_str()),
+        challenge = challenge,
+        state = state,
+    );
+
+    Json(LoginResponse { login_url: url })
+}
+
+#[derive(Deserialize)]
+struct LogoutRequest {
+    refresh_token: String,
+}
+
+async fn logout(
+    State(app_state): State<AppState>,
+    Json(payload): Json<LogoutRequest>,
+) -> StatusCode {
+    debug!("logout");
+
+    let revoke_url = format!(
+        "{}/realms/{}/protocol/openid-connect/revoke",
+        app_state.keycloak_base_url, app_state.keycloak_realm
+    );
+
+    match ureq::post(revoke_url).send_form([
+        ("token", payload.refresh_token.as_str()),
+        ("client_id", app_state.keycloak_client_id.as_str()),
+        ("token_type_hint", "refresh_token"),
+    ]) {
+        Ok(_) => StatusCode::NO_CONTENT,
+        Err(Error::StatusCode(code)) => {
+            dbg!(code);
+            return http::StatusCode::from_u16(code).unwrap();
+        }
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
+    };
+
+    // RFC 7009: success may return 200 or 204
+    StatusCode::NO_CONTENT
+}
+
+async fn callback(
+    State(app_state): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<Json<TokenResponse>, StatusCode> {
+    debug!("callback");
+
+    let code = params.get("code").ok_or(StatusCode::BAD_REQUEST)?;
+    let state = params.get("state").ok_or(StatusCode::BAD_REQUEST)?;
+
+    let keycloak_token_url = format!(
+        "{}/realms/{}/protocol/openid-connect/token",
+        app_state.keycloak_base_url, app_state.keycloak_realm
+    );
+    let keycloak_client_id = app_state.keycloak_client_id.as_str();
+    let keycloak_redirect_url = app_state.keycloak_redirect_url.as_str();
+
+    let pkce_store = app_state.pkce_store.lock().await;
+
+    // --- Take PKCE verifier and drop the lock ASAP ---
+    let verifier = pkce_store
+        .remove(state)
+        .map(|(_, v)| v)
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    let token = match ureq::post(keycloak_token_url).send_form([
+        ("grant_type", "authorization_code"),
+        ("client_id", keycloak_client_id),
+        ("code", code),
+        ("redirect_uri", keycloak_redirect_url),
+        ("code_verifier", &verifier),
+    ]) {
+        Ok(mut response) => response.body_mut().read_json::<TokenResponse>().unwrap(),
+        Err(Error::StatusCode(code)) => {
+            dbg!(code);
+            return Err(http::StatusCode::from_u16(code).unwrap());
+        }
+        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+    };
+
+    // ✅ Return tokens (or forward them securely to the CLI / app)
+    Ok(Json(TokenResponse {
+        access_token: token.access_token,
+        refresh_token: token.refresh_token,
+        expires_in: token.expires_in,
+    }))
+}
 
 // Extract OIDC claims from the request.
 // Insert the authenticated user id and email into the request headers.
 async fn authenticate_middleware(
     State(state): State<AppState>,
-    mayerr_claims: Result<OidcClaims<EmptyAdditionalClaims>, axum_oidc::error::ExtractorError>,
+    Extension(auth): Extension<AuthContext>,
     mut request: Request,
     next: Next,
 ) -> Response {
     debug!("authenticate_middleware");
 
+    if request.uri().path() == "/login" {
+        return next.run(request).await;
+    }
+
     let db_connection = state.db_connection_pool.get().unwrap();
 
-    // Get the claims from the request.
-    let Ok(claims) = mayerr_claims else {
-        return AppError::ClaimsRetrieval(mayerr_claims.err().unwrap().to_string()).into_response();
-    };
-
-    // Get the email from the claims.
-    let Some(claims_email) = claims.email() else {
+    if auth.email.is_empty() {
         return AppError::MissingEmailInClaims.into_response();
     };
-
-    // Convert the email to a string.
-    let person_email = claims_email.to_string();
 
     // Get the person from the database.
     let (people, _) = match chimitheque_db::person::get_people(
         db_connection.deref(),
         RequestFilter {
-            person_email: Some(person_email),
+            person_email: Some(auth.email),
             ..Default::default()
         },
         1,
@@ -144,6 +435,10 @@ async fn authorize_middleware(
     next: Next,
 ) -> Response {
     debug!("authorize_middleware");
+
+    if request.uri().path() == "/login" {
+        return next.run(request).await;
+    }
 
     // Get the item ID as a string.
     let item_id = match id {
@@ -220,13 +515,7 @@ async fn authorize_middleware(
     {
         // Get the casbin enforcer from the state object.
         // TODO: https://github.com/tokio-rs/axum/discussions/2458
-        let casbin_enforcer = state.casbin_enforcer;
-
-        // Then check the permissions.
-        let casbin_enforcer = match casbin_enforcer.lock() {
-            Ok(enforcer) => enforcer,
-            Err(err) => return AppError::CasbinEnforcerLockFailed(err.to_string()).into_response(),
-        };
+        let casbin_enforcer = state.casbin_enforcer.lock().await;
 
         match casbin_enforcer.enforce((
             chimitheque_person_id.to_string(),
@@ -250,44 +539,42 @@ async fn authorize_middleware(
 }
 
 // A debug middleware.
-async fn my_middleware(request: Request, next: Next) -> Response {
+async fn debug_middleware(
+    State(_state): State<AppState>,
+    request: Request,
+    next: Next,
+) -> Response {
     // do something with `request`...
+    dbg!("REQUEST");
+
     let request_headers = request.headers();
     request_headers.iter().for_each(|header| {
         println!("request header: {:?} = {:?}", header.0, header.1);
     });
 
+    // dbg!(state.pkce_store.clone());
+
     let response = next.run(request).await;
 
     // do something with `response`...
+    dbg!("RESPONSE");
+
     let response_headers = response.headers();
     response_headers.iter().for_each(|header| {
         println!("response header: {:?} = {:?}", header.0, header.1);
     });
 
+    // dbg!(state.pkce_store.clone());
+
     response
 }
 
-lazy_static! {
-    static ref chimitheque_full_url: String = {
-        // Load required environment variables.
-        // TODO: remove this with the new frontend.
-        let chimitheque_url =
-            env::var("CHIMITHEQUE_URL").expect("Missing CHIMITHEQUE_URL environment variable.");
-        let chimitheque_path =
-            env::var("CHIMITHEQUE_PATH").expect("Missing CHIMITHEQUE_PATH environment variable.");
-
-
-        format!("{}{}?auth=true", chimitheque_url, chimitheque_path)
-    };
-}
-
 pub async fn run(
-    app_url: String,
     db_path: String,
-    issuer: String,
+    keycloak_base_url: String,
+    keycloak_redirect_url: String,
+    keycloak_realm: String,
     client_id: String,
-    client_secret: Option<String>,
 ) {
     // Initialize logger.
     env_logger::builder()
@@ -303,9 +590,9 @@ pub async fn run(
         })
         .init();
 
-    debug!("chimitheque_full_url: {}", chimitheque_full_url.as_str());
-
     // Create DB pool.
+    info!("creating DB pool");
+
     let manager =
         SqliteConnectionManager::file(db_path.clone()).with_init(|conn: &mut Connection| {
             // Load SQLite extensions directory.
@@ -323,6 +610,7 @@ pub async fn run(
 
             Ok(())
         });
+
     let db_connection_pool = r2d2::Pool::builder().build(manager).unwrap();
 
     // Load extensions.
@@ -330,10 +618,14 @@ pub async fn run(
 
     // Check that DB file exist, create if not.
     if Path::new(&db_path).metadata().unwrap().size() == 0 {
+        info!("initialize DB");
+
         init_db(db_connection.deref_mut()).unwrap();
     } else {
         // Updating statements on already existing DB - panic on failure.
         let db_transaction = db_connection.transaction().unwrap();
+
+        info!("updating GHS statements");
 
         update_ghs_statements(&db_transaction).unwrap();
 
@@ -346,48 +638,35 @@ pub async fn run(
         .with_same_site(SameSite::Lax)
         .with_expiry(Expiry::OnInactivity(Duration::seconds(120)));
 
-    let oidc_login_service = ServiceBuilder::new()
-        .layer(HandleErrorLayer::new(|e: MiddlewareError| async {
-            e.into_response()
-        }))
-        .layer(OidcLoginLayer::<EmptyAdditionalClaims>::new());
-
-    let oidc_auth_service = ServiceBuilder::new()
-        .layer(HandleErrorLayer::new(|e: MiddlewareError| async {
-            e.into_response()
-        }))
-        .layer(
-            OidcAuthLayer::<EmptyAdditionalClaims>::discover_client(
-                Uri::from_maybe_shared(app_url).expect("valid APP_URL"),
-                issuer,
-                client_id,
-                client_secret,
-                vec![],
-            )
-            .await
-            .unwrap(),
-        );
-
     // Initialize the Casbin toolkit.
+    info!("initialize casbin");
+
     let casbin_string_adapter = to_string_adapter(db_connection.deref()).unwrap();
     let casbin_model = DefaultModel::from_file("casbin/policy.conf").await.unwrap();
-
-    // TODO: FIXME
     let casbin_adapter = StringAdapter::new(casbin_string_adapter.clone());
     let casbin_enforcer = Arc::new(Mutex::new(
         Enforcer::new(casbin_model, casbin_adapter).await.unwrap(),
     ));
 
     // Initialize rate limiter for pubchem requests.
+    info!("initialize the request rate limiter");
+
     let rate_limiter = RateLimiter::direct(Quota::per_second(NonZeroU32::new(5).unwrap()));
 
     let mut state = AppState {
         casbin_enforcer,
         db_connection_pool: Arc::new(db_connection_pool),
         rate_limiter: Arc::new(rate_limiter),
+        keycloak_client_id: client_id,
+        keycloak_redirect_url,
+        keycloak_realm,
+        keycloak_base_url,
+        pkce_store: Arc::new(Mutex::new(DashMap::new())),
     };
 
-    state.set_enforcer();
+    info!("loading casbin enforcer functions");
+
+    state.set_enforcer().await;
 
     //     requests
     //        |
@@ -405,23 +684,27 @@ pub async fn run(
     //        v
     //     responses
 
+    // Build your custom TLS HTTP client (with self-signed cert).
+    let tls_config = ureq::tls::TlsConfig::builder()
+        .disable_verification(true) // ✨ allow self-signed
+        .build();
+
+    // Build request config
+    let config = Config::builder().tls_config(tls_config).build();
+
+    // Create shared agent
+    let http_client = Arc::new(config.new_agent());
+
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
+    info!("initialize routes");
+
     let app = Router::new()
         //
-        .route("/authenticated", get(authenticated))
-        //
         .route("/getconnecteduser", get(get_connected_user))
-        //
-        .route("/logout", get(logout))
-        // TODO: remove this route with the new frontend
-        .route(
-            "/login",
-            get(|| async { Redirect::permanent(chimitheque_full_url.as_str()) }),
-        )
         //
         .route("/store_locations", get(get_store_locations))
         .route("/store_locations/{id}", get(get_store_locations))
@@ -448,6 +731,7 @@ pub async fn run(
         .route("/f/people/{id}", delete(fake))
         //
         .route("/entities", get(get_entities))
+        .route("/entities_old", get(get_entities_old))
         .route("/entities/{id}", get(get_entities))
         .route("/entities/{id}", put(create_update_entity))
         .route("/entities", post(create_update_entity))
@@ -547,39 +831,23 @@ pub async fn run(
             state.clone(),
             authenticate_middleware,
         ))
-        .layer(oidc_login_service)
-        // unused endpoint
-        .route("/maybe_authenticated", get(maybe_authenticated))
-        .layer(oidc_auth_service)
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            jwt_middleware,
+        ))
+        .route("/auth/login", post(login))
+        .route("/auth/callback", get(callback))
+        .route("/auth/logout", post(logout))
+        .layer(Extension(http_client))
+        // .layer(middleware::from_fn_with_state(state.clone(), my_middleware))
         .layer(session_layer)
         .layer(cors)
-        .layer(middleware::from_fn(my_middleware))
         .with_state(state);
+
+    info!("running server");
 
     let listener = TcpListener::bind("[::]:8083").await.unwrap();
     axum::serve(listener, app.into_make_service())
         .await
         .unwrap();
-}
-
-async fn authenticated(claims: OidcClaims<EmptyAdditionalClaims>) -> impl IntoResponse {
-    format!("Hello {}", claims.subject().as_str())
-}
-
-#[axum::debug_handler]
-async fn maybe_authenticated(
-    claims: Result<OidcClaims<EmptyAdditionalClaims>, axum_oidc::error::ExtractorError>,
-) -> impl IntoResponse {
-    if let Ok(claims) = claims {
-        format!(
-            "Hello {}! You are already logged in from another Handler.",
-            claims.subject().as_str()
-        )
-    } else {
-        "Hello anon!".to_string()
-    }
-}
-
-async fn logout(logout: OidcRpInitiatedLogout) -> impl IntoResponse {
-    logout.with_post_logout_redirect(Uri::from_static("https://pfzetto.de"))
 }

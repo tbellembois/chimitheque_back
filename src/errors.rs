@@ -6,8 +6,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AppError {
-    #[error("claims retrieval: {0}")]
-    ClaimsRetrieval(String),
     #[error("missing email in claims")]
     MissingEmailInClaims,
     #[error("parse URI: {0}")]
@@ -36,14 +34,24 @@ pub enum AppError {
     InputValidation(String),
     #[error("pubchem error: {0}")]
     Pubchem(String),
+    #[error("bearer token missing error")]
+    BearerTokenMissing,
+    #[error("decode jwt header error: {0}")]
+    DecodeJWTHeader(String),
+    #[error("header kid missing")]
+    HeaderKIDMissing,
+    #[error("rsa jwk not found in cache with kid {0}")]
+    RSAJWKNotFoundInCache(String),
+    #[error("claims decoding: {0}")]
+    ClaimsDecoding(String),
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, body) = match self {
-            AppError::ClaimsRetrieval(s) => (
+            AppError::ClaimsDecoding(s) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                AppError::ClaimsRetrieval(s).to_string(),
+                AppError::ClaimsDecoding(s).to_string(),
             ),
             AppError::MissingEmailInClaims => (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -96,6 +104,22 @@ impl IntoResponse for AppError {
             AppError::Pubchem(s) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 AppError::Pubchem(s).to_string(),
+            ),
+            AppError::BearerTokenMissing => (
+                StatusCode::UNAUTHORIZED,
+                AppError::BearerTokenMissing.to_string(),
+            ),
+            AppError::DecodeJWTHeader(s) => (
+                StatusCode::UNAUTHORIZED,
+                AppError::DecodeJWTHeader(s).to_string(),
+            ),
+            AppError::HeaderKIDMissing => (
+                StatusCode::UNAUTHORIZED,
+                AppError::HeaderKIDMissing.to_string(),
+            ),
+            AppError::RSAJWKNotFoundInCache(kid) => (
+                StatusCode::UNAUTHORIZED,
+                AppError::RSAJWKNotFoundInCache(kid).to_string(),
             ),
         };
         (status, body).into_response()
