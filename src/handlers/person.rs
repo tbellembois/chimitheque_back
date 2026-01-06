@@ -1,6 +1,7 @@
 use axum::{Json, extract::State, http::HeaderMap};
 use axum_extra::extract::Query;
 use chimitheque_types::{person::Person, requestfilter::RequestFilter};
+use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
 use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
@@ -57,6 +58,42 @@ pub async fn get_people(
 
     match mayerr_people {
         Ok(people) => Ok(Json(people)),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct GetPeopleOldResponse {
+    rows: Vec<Person>,
+    total: usize,
+}
+
+pub async fn get_people_old(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(request_filter): Query<RequestFilter>,
+) -> Result<Json<GetPeopleOldResponse>, AppError> {
+    // Get the chimitheque_person_id.
+    let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
+        Ok(chimitheque_person_id) => chimitheque_person_id,
+        Err(err) => return Err(err),
+    };
+
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    let mayerr_people = chimitheque_db::person::get_people(
+        db_connection.deref(),
+        request_filter,
+        chimitheque_person_id,
+    );
+
+    match mayerr_people {
+        Ok(people) => Ok(Json(GetPeopleOldResponse {
+            rows: people.0,
+            total: people.1,
+        })),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }

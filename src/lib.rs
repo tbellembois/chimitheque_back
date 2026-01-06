@@ -13,8 +13,12 @@ use crate::{
             create_update_entity, delete_entity, get_entities, get_entities_old, get_entity_stock,
         },
         fake::fake,
-        person::{create_update_person, delete_person, get_connected_user, get_people},
-        product::{create_update_product, delete_product, export_products, get_products},
+        person::{
+            create_update_person, delete_person, get_connected_user, get_people, get_people_old,
+        },
+        product::{
+            create_update_product, delete_product, export_products, get_products, get_products_old,
+        },
         pubchem::{
             pubchem_autocomplete, pubchem_create_update_product, pubchem_getcompoundbyname,
             pubchem_getproductbyname,
@@ -32,6 +36,7 @@ use crate::{
         },
         store_location::{
             create_update_store_location, delete_store_location, get_store_locations,
+            get_store_locations_old,
         },
         validate::{
             validate_cas_number, validate_ce_number, validate_email, validate_empirical_formula,
@@ -707,6 +712,7 @@ pub async fn run(
         .route("/getconnecteduser", get(get_connected_user))
         //
         .route("/store_locations", get(get_store_locations))
+        .route("/store_locations_old", get(get_store_locations_old))
         .route("/store_locations/{id}", get(get_store_locations))
         .route("/store_locations/{id}", put(create_update_store_location))
         .route("/store_locations", post(create_update_store_location))
@@ -719,6 +725,7 @@ pub async fn run(
         .route("/f/store_locations/{id}", delete(fake))
         //
         .route("/people", get(get_people))
+        .route("/people_old", get(get_people_old))
         .route("/people/{id}", get(get_people))
         .route("/people/{id}", put(create_update_person))
         .route("/people", post(create_update_person))
@@ -746,6 +753,7 @@ pub async fn run(
         .route("/stocks/{id}", get(get_entity_stock))
         //
         .route("/products", get(get_products))
+        .route("/products_old", get(get_products_old))
         .route("/products/{id}", get(get_products))
         .route("/products/{id}", put(create_update_product))
         .route("/products", post(create_update_product))
