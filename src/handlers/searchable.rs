@@ -2,12 +2,10 @@ use axum::{Json, extract::State};
 use chimitheque_db::searchable::get_many;
 use chimitheque_traits::searchable::Searchable;
 use chimitheque_types::{
-    casnumber::CasNumber, category::Category, cenumber::CeNumber, classofcompound::ClassOfCompound,
-    empiricalformula::EmpiricalFormula, hazardstatement::HazardStatement,
-    linearformula::LinearFormula, name::Name, physicalstate::PhysicalState,
-    precautionarystatement::PrecautionaryStatement, producer::Producer, producerref::ProducerRef,
-    requestfilter::RequestFilter, signalword::SignalWord, supplier::Supplier,
-    supplierref::SupplierRef, symbol::Symbol, tag::Tag,
+    casnumber::CasNumber, category::Category, cenumber::CeNumber, hazardstatement::HazardStatement,
+    name::Name, physicalstate::PhysicalState, precautionarystatement::PrecautionaryStatement,
+    producer::Producer, producerref::ProducerRef, requestfilter::RequestFilter,
+    signalword::SignalWord, supplier::Supplier, supplierref::SupplierRef, symbol::Symbol, tag::Tag,
 };
 use chimitheque_utils::string::Transform;
 use serde::{Deserialize, Serialize};
@@ -36,9 +34,9 @@ pub async fn get_cas_numbers(
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct GetCasNumbersOldResponse<T>
+pub struct GetSearchableOldResponse<T>
 where
-    T: Searchable + Serialize,
+    T: Serialize,
 {
     rows: Vec<T>,
     total: usize,
@@ -59,7 +57,7 @@ pub async fn get_cas_numbers_old(
         db_connection.deref(),
         request_filter,
     ) {
-        Ok((cas_numbers, count)) => Ok(Json(Box::new(GetCasNumbersOldResponse {
+        Ok((cas_numbers, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: cas_numbers,
             total: count,
         }))),
@@ -87,6 +85,29 @@ pub async fn get_ce_numbers(
     }
 }
 
+pub async fn get_ce_numbers_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &CeNumber {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((ce_numbers, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: ce_numbers,
+            total: count,
+        }))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
 pub async fn get_categories(
     State(state): State<AppState>,
     request_filter: RequestFilter,
@@ -107,6 +128,29 @@ pub async fn get_categories(
     }
 }
 
+pub async fn get_categories_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &Category {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((categories, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: categories,
+            total: count,
+        }))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
 pub async fn get_classes_of_compounds(
     State(state): State<AppState>,
     request_filter: RequestFilter,
@@ -116,13 +160,36 @@ pub async fn get_classes_of_compounds(
     let db_connection = db_connection_pool.get().unwrap();
 
     match get_many(
-        &ClassOfCompound {
+        &Name {
             ..Default::default()
         },
         db_connection.deref(),
         request_filter,
     ) {
         Ok((classes_of_compounds, count)) => Ok(Json((classes_of_compounds, count))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+pub async fn get_classes_of_compounds_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &Name {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((classes_of_compounds, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: classes_of_compounds,
+            total: count,
+        }))),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }
@@ -136,13 +203,36 @@ pub async fn get_empirical_formulas(
     let db_connection = db_connection_pool.get().unwrap();
 
     match get_many(
-        &EmpiricalFormula {
+        &Name {
             ..Default::default()
         },
         db_connection.deref(),
         request_filter,
     ) {
         Ok((empirical_formulas, count)) => Ok(Json((empirical_formulas, count))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+pub async fn get_empirical_formulas_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &Name {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((empirical_formulas, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: empirical_formulas,
+            total: count,
+        }))),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }
@@ -156,13 +246,36 @@ pub async fn get_linear_formulas(
     let db_connection = db_connection_pool.get().unwrap();
 
     match get_many(
-        &LinearFormula {
+        &Name {
             ..Default::default()
         },
         db_connection.deref(),
         request_filter,
     ) {
         Ok((linear_formulas, count)) => Ok(Json((linear_formulas, count))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+pub async fn get_linear_formulas_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &Name {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((linear_formulas, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: linear_formulas,
+            total: count,
+        }))),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }
@@ -187,6 +300,29 @@ pub async fn get_names(
     }
 }
 
+pub async fn get_names_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &Name {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((names, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: names,
+            total: count,
+        }))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
 pub async fn get_physical_states(
     State(state): State<AppState>,
     request_filter: RequestFilter,
@@ -203,6 +339,29 @@ pub async fn get_physical_states(
         request_filter,
     ) {
         Ok((physical_states, count)) => Ok(Json((physical_states, count))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+pub async fn get_physical_states_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &PhysicalState {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((physical_states, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: physical_states,
+            total: count,
+        }))),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }
@@ -227,6 +386,29 @@ pub async fn get_symbols(
     }
 }
 
+pub async fn get_symbols_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &Symbol {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((symbols, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: symbols,
+            total: count,
+        }))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
 pub async fn get_tags(
     State(state): State<AppState>,
     request_filter: RequestFilter,
@@ -243,6 +425,29 @@ pub async fn get_tags(
         request_filter,
     ) {
         Ok((tags, count)) => Ok(Json((tags, count))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+pub async fn get_tags_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &Tag {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((tags, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: tags,
+            total: count,
+        }))),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }
@@ -267,6 +472,29 @@ pub async fn get_signal_words(
     }
 }
 
+pub async fn get_signal_words_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &SignalWord {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((signal_words, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: signal_words,
+            total: count,
+        }))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
 pub async fn get_hazard_statements(
     State(state): State<AppState>,
     request_filter: RequestFilter,
@@ -283,6 +511,29 @@ pub async fn get_hazard_statements(
         request_filter,
     ) {
         Ok((hazard_statements, count)) => Ok(Json((hazard_statements, count))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+pub async fn get_hazard_statements_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &HazardStatement {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((hazard_statements, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: hazard_statements,
+            total: count,
+        }))),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }
@@ -307,6 +558,29 @@ pub async fn get_precautionary_statements(
     }
 }
 
+pub async fn get_precautionary_statements_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &PrecautionaryStatement {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((precautionary_statements, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: precautionary_statements,
+            total: count,
+        }))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
 pub async fn get_producers(
     State(state): State<AppState>,
     request_filter: RequestFilter,
@@ -323,6 +597,29 @@ pub async fn get_producers(
         request_filter,
     ) {
         Ok((producers, count)) => Ok(Json((producers, count))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+pub async fn get_producers_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &Producer {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((producers, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: producers,
+            total: count,
+        }))),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }
@@ -347,6 +644,29 @@ pub async fn get_suppliers(
     }
 }
 
+pub async fn get_suppliers_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match get_many(
+        &Supplier {
+            ..Default::default()
+        },
+        db_connection.deref(),
+        request_filter,
+    ) {
+        Ok((suppliers, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: suppliers,
+            total: count,
+        }))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
 pub async fn get_producer_refs(
     State(state): State<AppState>,
     request_filter: RequestFilter,
@@ -361,6 +681,23 @@ pub async fn get_producer_refs(
     }
 }
 
+pub async fn get_producer_refs_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match chimitheque_db::producerref::get_producer_refs(db_connection.deref(), request_filter) {
+        Ok((producer_refs, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: producer_refs,
+            total: count,
+        }))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
 pub async fn get_supplier_refs(
     State(state): State<AppState>,
     request_filter: RequestFilter,
@@ -371,6 +708,23 @@ pub async fn get_supplier_refs(
 
     match chimitheque_db::supplierref::get_supplier_refs(db_connection.deref(), request_filter) {
         Ok((supplier_refs, count)) => Ok(Json((supplier_refs, count))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+pub async fn get_supplier_refs_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match chimitheque_db::supplierref::get_supplier_refs(db_connection.deref(), request_filter) {
+        Ok((supplier_refs, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: supplier_refs,
+            total: count,
+        }))),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }

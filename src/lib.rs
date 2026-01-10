@@ -25,10 +25,15 @@ use crate::{
         },
         searchable::{
             create_producer, create_supplier, get_cas_numbers, get_cas_numbers_old, get_categories,
-            get_ce_numbers, get_classes_of_compounds, get_empirical_formulas,
-            get_hazard_statements, get_linear_formulas, get_names, get_physical_states,
-            get_precautionary_statements, get_producer_refs, get_producers, get_signal_words,
-            get_supplier_refs, get_suppliers, get_symbols, get_tags,
+            get_categories_old, get_ce_numbers, get_ce_numbers_old, get_classes_of_compounds,
+            get_classes_of_compounds_old, get_empirical_formulas, get_empirical_formulas_old,
+            get_hazard_statements, get_hazard_statements_old, get_linear_formulas,
+            get_linear_formulas_old, get_names, get_names_old, get_physical_states,
+            get_physical_states_old, get_precautionary_statements,
+            get_precautionary_statements_old, get_producer_refs, get_producer_refs_old,
+            get_producers, get_producers_old, get_signal_words, get_signal_words_old,
+            get_supplier_refs, get_supplier_refs_old, get_suppliers, get_suppliers_old,
+            get_symbols, get_symbols_old, get_tags, get_tags_old,
         },
         storage::{
             archive_storage, create_update_storage, delete_storage, export_storages, get_storages,
@@ -798,27 +803,55 @@ pub async fn run(
         .route("/products/casnumbers", get(get_cas_numbers))
         .route("/products/casnumbers_old", get(get_cas_numbers_old))
         .route("/products/cenumbers", get(get_ce_numbers))
+        .route("/products/cenumbers_old", get(get_ce_numbers_old))
         .route("/products/names", get(get_names))
+        .route("/products/names_old", get(get_names_old))
         .route("/products/linearformulas", get(get_linear_formulas))
+        .route("/products/linearformulas_old", get(get_linear_formulas_old))
         .route("/products/empiricalformulas", get(get_empirical_formulas))
+        .route(
+            "/products/empiricalformulas_old",
+            get(get_empirical_formulas_old),
+        )
         .route("/products/physicalstates", get(get_physical_states))
+        .route("/products/physicalstates_old", get(get_physical_states_old))
         .route("/products/signalwords", get(get_signal_words))
+        .route("/products/signalwords_old", get(get_signal_words_old))
         .route("/products/symbols", get(get_symbols))
+        .route("/products/symbols_old", get(get_symbols_old))
         .route(
             "/products/classesofcompounds",
             get(get_classes_of_compounds),
         )
+        .route(
+            "/products/classesofcompounds_old",
+            get(get_classes_of_compounds_old),
+        )
         .route("/products/hazardstatements", get(get_hazard_statements))
+        .route(
+            "/products/hazardstatements_old",
+            get(get_hazard_statements_old),
+        )
         .route(
             "/products/precautionarystatements",
             get(get_precautionary_statements),
         )
+        .route(
+            "/products/precautionarystatements_old",
+            get(get_precautionary_statements_old),
+        )
         .route("/products/categories", get(get_categories))
+        .route("/products/categories_old", get(get_categories_old))
         .route("/products/tags", get(get_tags))
+        .route("/products/tags_old", get(get_tags_old))
         .route("/products/producers", get(get_producers))
+        .route("/products/producers_old", get(get_producers_old))
         .route("/products/producerrefs", get(get_producer_refs))
+        .route("/products/producerrefs_old", get(get_producer_refs_old))
         .route("/products/suppliers", get(get_suppliers))
+        .route("/products/suppliers_old", get(get_suppliers_old))
         .route("/products/supplierrefs", get(get_supplier_refs))
+        .route("/products/supplierrefs_old", get(get_supplier_refs_old))
         .route("/products/producers", post(create_producer))
         .route("/products/suppliers", post(create_supplier))
         //
