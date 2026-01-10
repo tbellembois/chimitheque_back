@@ -33,7 +33,7 @@ use crate::{
             get_precautionary_statements_old, get_producer_refs, get_producer_refs_old,
             get_producers, get_producers_old, get_signal_words, get_signal_words_old,
             get_supplier_refs, get_supplier_refs_old, get_suppliers, get_suppliers_old,
-            get_symbols, get_symbols_old, get_tags, get_tags_old,
+            get_symbols, get_symbols_old, get_tags, get_tags_old, get_units, get_units_old,
         },
         storage::{
             archive_storage, create_update_storage, delete_storage, export_storages, get_storages,
@@ -800,6 +800,8 @@ pub async fn run(
         .route("/pubchemproduct", post(pubchem_create_update_product))
         .route("/pubchemproduct/{id}", post(pubchem_create_update_product))
         //
+        .route("/storages/units", get(get_units))
+        .route("/storages/units_old", get(get_units_old))
         .route("/products/casnumbers", get(get_cas_numbers))
         .route("/products/casnumbers_old", get(get_cas_numbers_old))
         .route("/products/cenumbers", get(get_ce_numbers))

@@ -2,10 +2,12 @@ use axum::{Json, extract::State};
 use chimitheque_db::searchable::get_many;
 use chimitheque_traits::searchable::Searchable;
 use chimitheque_types::{
-    casnumber::CasNumber, category::Category, cenumber::CeNumber, hazardstatement::HazardStatement,
-    name::Name, physicalstate::PhysicalState, precautionarystatement::PrecautionaryStatement,
-    producer::Producer, producerref::ProducerRef, requestfilter::RequestFilter,
-    signalword::SignalWord, supplier::Supplier, supplierref::SupplierRef, symbol::Symbol, tag::Tag,
+    casnumber::CasNumber, category::Category, cenumber::CeNumber, classofcompound::ClassOfCompound,
+    empiricalformula::EmpiricalFormula, hazardstatement::HazardStatement,
+    linearformula::LinearFormula, name::Name, physicalstate::PhysicalState,
+    precautionarystatement::PrecautionaryStatement, producer::Producer, producerref::ProducerRef,
+    requestfilter::RequestFilter, signalword::SignalWord, supplier::Supplier,
+    supplierref::SupplierRef, symbol::Symbol, tag::Tag, unit::Unit,
 };
 use chimitheque_utils::string::Transform;
 use serde::{Deserialize, Serialize};
@@ -160,7 +162,7 @@ pub async fn get_classes_of_compounds(
     let db_connection = db_connection_pool.get().unwrap();
 
     match get_many(
-        &Name {
+        &ClassOfCompound {
             ..Default::default()
         },
         db_connection.deref(),
@@ -180,7 +182,7 @@ pub async fn get_classes_of_compounds_old(
     let db_connection = db_connection_pool.get().unwrap();
 
     match get_many(
-        &Name {
+        &ClassOfCompound {
             ..Default::default()
         },
         db_connection.deref(),
@@ -203,7 +205,7 @@ pub async fn get_empirical_formulas(
     let db_connection = db_connection_pool.get().unwrap();
 
     match get_many(
-        &Name {
+        &EmpiricalFormula {
             ..Default::default()
         },
         db_connection.deref(),
@@ -223,7 +225,7 @@ pub async fn get_empirical_formulas_old(
     let db_connection = db_connection_pool.get().unwrap();
 
     match get_many(
-        &Name {
+        &EmpiricalFormula {
             ..Default::default()
         },
         db_connection.deref(),
@@ -246,7 +248,7 @@ pub async fn get_linear_formulas(
     let db_connection = db_connection_pool.get().unwrap();
 
     match get_many(
-        &Name {
+        &LinearFormula {
             ..Default::default()
         },
         db_connection.deref(),
@@ -266,7 +268,7 @@ pub async fn get_linear_formulas_old(
     let db_connection = db_connection_pool.get().unwrap();
 
     match get_many(
-        &Name {
+        &LinearFormula {
             ..Default::default()
         },
         db_connection.deref(),
@@ -723,6 +725,37 @@ pub async fn get_supplier_refs_old(
     match chimitheque_db::supplierref::get_supplier_refs(db_connection.deref(), request_filter) {
         Ok((supplier_refs, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: supplier_refs,
+            total: count,
+        }))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+pub async fn get_units(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<(Vec<Unit>, usize)>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match chimitheque_db::unit::get_units(db_connection.deref(), request_filter) {
+        Ok((units, count)) => Ok(Json((units, count))),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+pub async fn get_units_old(
+    State(state): State<AppState>,
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    // Get the connection from the database.
+    let db_connection_pool = state.db_connection_pool.clone();
+    let db_connection = db_connection_pool.get().unwrap();
+
+    match chimitheque_db::unit::get_units(db_connection.deref(), request_filter) {
+        Ok((units, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
+            rows: units,
             total: count,
         }))),
         Err(err) => Err(AppError::Database(err.to_string())),
