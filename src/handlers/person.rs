@@ -1,5 +1,8 @@
-use axum::{Json, extract::State, http::HeaderMap};
-use axum_extra::extract::Query;
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::HeaderMap,
+};
 use chimitheque_types::{person::Person, requestfilter::RequestFilter};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
@@ -38,7 +41,7 @@ pub async fn get_connected_user(
 pub async fn get_people(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Query(request_filter): Query<RequestFilter>,
+    request_filter: RequestFilter,
 ) -> Result<Json<(Vec<Person>, usize)>, AppError> {
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
@@ -71,8 +74,8 @@ pub struct GetPeopleOldResponse {
 pub async fn get_people_old(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Query(request_filter): Query<RequestFilter>,
-) -> Result<Json<GetPeopleOldResponse>, AppError> {
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
@@ -85,16 +88,23 @@ pub async fn get_people_old(
 
     let mayerr_people = chimitheque_db::person::get_people(
         db_connection.deref(),
-        request_filter,
+        request_filter.clone(),
         chimitheque_person_id,
     );
 
-    match mayerr_people {
-        Ok(people) => Ok(Json(GetPeopleOldResponse {
-            rows: people.0,
-            total: people.1,
-        })),
-        Err(err) => Err(AppError::Database(err.to_string())),
+    if request_filter.id.is_none() {
+        match mayerr_people {
+            Ok(people) => Ok(Json(Box::new(GetPeopleOldResponse {
+                rows: people.0,
+                total: people.1,
+            }))),
+            Err(err) => Err(AppError::Database(err.to_string())),
+        }
+    } else {
+        match mayerr_people {
+            Ok(people) => Ok(Json(Box::new(people.0.first().unwrap().to_owned()))),
+            Err(err) => Err(AppError::Database(err.to_string())),
+        }
     }
 }
 
@@ -123,7 +133,7 @@ pub async fn create_update_person(
 
 pub async fn delete_person(
     State(state): State<AppState>,
-    Query(id): Query<u64>,
+    Path(id): Path<u64>,
 ) -> Result<(), AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();

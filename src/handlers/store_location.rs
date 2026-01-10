@@ -1,5 +1,8 @@
-use axum::{Json, extract::State, http::HeaderMap};
-use axum_extra::extract::Query;
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::HeaderMap,
+};
 use chimitheque_types::{requestfilter::RequestFilter, storelocation::StoreLocation};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
@@ -9,7 +12,7 @@ use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_he
 pub async fn get_store_locations(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Query(request_filter): Query<RequestFilter>,
+    request_filter: RequestFilter,
 ) -> Result<Json<(Vec<StoreLocation>, usize)>, AppError> {
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
@@ -42,8 +45,8 @@ pub struct GetStoreLocationsOldResponse {
 pub async fn get_store_locations_old(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Query(request_filter): Query<RequestFilter>,
-) -> Result<Json<GetStoreLocationsOldResponse>, AppError> {
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
@@ -56,16 +59,25 @@ pub async fn get_store_locations_old(
 
     let mayerr_store_locations = chimitheque_db::storelocation::get_store_locations(
         db_connection.deref(),
-        request_filter,
+        request_filter.clone(),
         chimitheque_person_id,
     );
 
-    match mayerr_store_locations {
-        Ok(store_locations) => Ok(Json(GetStoreLocationsOldResponse {
-            rows: store_locations.0,
-            total: store_locations.1,
-        })),
-        Err(err) => Err(AppError::Database(err.to_string())),
+    if request_filter.id.is_none() {
+        match mayerr_store_locations {
+            Ok(store_locations) => Ok(Json(Box::new(GetStoreLocationsOldResponse {
+                rows: store_locations.0,
+                total: store_locations.1,
+            }))),
+            Err(err) => Err(AppError::Database(err.to_string())),
+        }
+    } else {
+        match mayerr_store_locations {
+            Ok(store_locations) => Ok(Json(Box::new(
+                store_locations.0.first().unwrap().to_owned(),
+            ))),
+            Err(err) => Err(AppError::Database(err.to_string())),
+        }
     }
 }
 
@@ -96,7 +108,7 @@ pub async fn create_update_store_location(
 
 pub async fn delete_store_location(
     State(state): State<AppState>,
-    Query(id): Query<u64>,
+    Path(id): Path<u64>,
 ) -> Result<(), AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();

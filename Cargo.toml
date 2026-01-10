@@ -13,6 +13,7 @@ chrono = "0.4.42"
 dashmap = "6.1.0"
 dotenvy = "0.15"
 env_logger = "0.11.8"
+erased-serde = "0.3.31"
 governor = "0.10.1"
 http = "1.4.0"
 jsonwebtoken = {version="10.2.0", features=["rust_crypto"]}

@@ -671,6 +671,7 @@ dependencies = [
  "dashmap",
  "dotenvy",
  "env_logger 0.11.8",
+ "erased-serde",
  "governor",
  "http 1.4.0",
  "jsonwebtoken 10.2.0",

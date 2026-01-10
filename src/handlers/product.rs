@@ -1,5 +1,8 @@
-use axum::{Json, extract::State, http::HeaderMap};
-use axum_extra::extract::Query;
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::HeaderMap,
+};
 use chimitheque_types::{product::Product, requestfilter::RequestFilter};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
@@ -9,8 +12,8 @@ use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_he
 pub async fn get_products(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Query(request_filter): Query<RequestFilter>,
-) -> Result<Json<(Vec<Product>, usize)>, AppError> {
+    request_filter: RequestFilter,
+) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
@@ -23,13 +26,23 @@ pub async fn get_products(
 
     let mayerr_products = chimitheque_db::product::get_products(
         db_connection.deref(),
-        request_filter,
+        request_filter.clone(),
         chimitheque_person_id,
     );
 
-    match mayerr_products {
-        Ok(products) => Ok(Json(products)),
-        Err(err) => Err(AppError::Database(err.to_string())),
+    if request_filter.id.is_none() {
+        match mayerr_products {
+            Ok(products) => Ok(Json(Box::new(GetProductsOldResponse {
+                rows: products.0,
+                total: products.1,
+            }))),
+            Err(err) => Err(AppError::Database(err.to_string())),
+        }
+    } else {
+        match mayerr_products {
+            Ok(products) => Ok(Json(Box::new(products.0.first().unwrap().to_owned()))),
+            Err(err) => Err(AppError::Database(err.to_string())),
+        }
     }
 }
 
@@ -42,7 +55,7 @@ pub struct GetProductsOldResponse {
 pub async fn get_products_old(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Query(request_filter): Query<RequestFilter>,
+    request_filter: RequestFilter,
 ) -> Result<Json<GetProductsOldResponse>, AppError> {
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
@@ -94,7 +107,7 @@ pub async fn create_update_product(
 
 pub async fn delete_product(
     State(state): State<AppState>,
-    Query(id): Query<u64>,
+    Path(id): Path<u64>,
 ) -> Result<(), AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -109,7 +122,7 @@ pub async fn delete_product(
 pub async fn export_products(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Query(request_filter): Query<RequestFilter>,
+    request_filter: RequestFilter,
 ) -> Result<String, AppError> {
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {

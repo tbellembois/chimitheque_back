@@ -24,15 +24,15 @@ use crate::{
             pubchem_getproductbyname,
         },
         searchable::{
-            create_producer, create_supplier, get_cas_numbers, get_categories, get_ce_numbers,
-            get_classes_of_compounds, get_empirical_formulas, get_hazard_statements,
-            get_linear_formulas, get_names, get_physical_states, get_precautionary_statements,
-            get_producer_refs, get_producers, get_signal_words, get_supplier_refs, get_suppliers,
-            get_symbols, get_tags,
+            create_producer, create_supplier, get_cas_numbers, get_cas_numbers_old, get_categories,
+            get_ce_numbers, get_classes_of_compounds, get_empirical_formulas,
+            get_hazard_statements, get_linear_formulas, get_names, get_physical_states,
+            get_precautionary_statements, get_producer_refs, get_producers, get_signal_words,
+            get_supplier_refs, get_suppliers, get_symbols, get_tags,
         },
         storage::{
             archive_storage, create_update_storage, delete_storage, export_storages, get_storages,
-            unarchive_storage,
+            get_storages_old, unarchive_storage,
         },
         store_location::{
             create_update_store_location, delete_store_location, get_store_locations,
@@ -44,6 +44,7 @@ use crate::{
     },
     utils::get_chimitheque_person_id_from_headers,
 };
+
 use axum::{
     Extension, Json, Router,
     extract::{Request, State},
@@ -109,13 +110,12 @@ struct TokenResponse {
 #[derive(Debug, Deserialize)]
 struct Claims {
     email: Option<String>,
-
     sub: String, // Keycloak user ID (UUID)
-    iss: String, // The iss (issuer) claim identifies the principal that issued the JWT.
+                 // iss: String, // The iss (issuer) claim identifies the principal that issued the JWT.
 
-    // Keycloak: string OR array
-    #[serde(default)]
-    aud: Option<serde_json::Value>, // A string or array of strings that identifies the recipients that the JWT is intended for.
+                 // Keycloak: string OR array
+                 // #[serde(default)]
+                 // aud: Option<serde_json::Value>, // A string or array of strings that identifies the recipients that the JWT is intended for.
 }
 
 static JWKS_CACHE: OnceCell<Mutex<JwksCache>> = OnceCell::new();
@@ -138,12 +138,12 @@ pub struct AccessToken(pub String);
 
 #[derive(Debug, Deserialize)]
 struct RsaJwk {
-    kty: String,
-    kid: String,
-    r#use: String, // 'use' is reserved
-    alg: String,
     n: String,
     e: String,
+    kid: String,
+    // kty: String,
+    // r#use: String,
+    // alg: String,
 }
 
 // Cached JWKS with timestamp.
@@ -544,7 +544,7 @@ async fn authorize_middleware(
 }
 
 // A debug middleware.
-async fn debug_middleware(
+async fn _debug_middleware(
     State(_state): State<AppState>,
     request: Request,
     next: Next,
@@ -557,8 +557,6 @@ async fn debug_middleware(
         println!("request header: {:?} = {:?}", header.0, header.1);
     });
 
-    // dbg!(state.pkce_store.clone());
-
     let response = next.run(request).await;
 
     // do something with `response`...
@@ -568,8 +566,6 @@ async fn debug_middleware(
     response_headers.iter().for_each(|header| {
         println!("response header: {:?} = {:?}", header.0, header.1);
     });
-
-    // dbg!(state.pkce_store.clone());
 
     response
 }
@@ -712,8 +708,9 @@ pub async fn run(
         .route("/getconnecteduser", get(get_connected_user))
         //
         .route("/store_locations", get(get_store_locations))
-        .route("/store_locations_old", get(get_store_locations_old))
         .route("/store_locations/{id}", get(get_store_locations))
+        .route("/store_locations_old", get(get_store_locations_old))
+        .route("/store_locations_old/{id}", get(get_store_locations_old))
         .route("/store_locations/{id}", put(create_update_store_location))
         .route("/store_locations", post(create_update_store_location))
         .route("/store_locations/{id}", delete(delete_store_location))
@@ -725,8 +722,9 @@ pub async fn run(
         .route("/f/store_locations/{id}", delete(fake))
         //
         .route("/people", get(get_people))
-        .route("/people_old", get(get_people_old))
         .route("/people/{id}", get(get_people))
+        .route("/people_old", get(get_people_old))
+        .route("/people_old/{id}", get(get_people_old))
         .route("/people/{id}", put(create_update_person))
         .route("/people", post(create_update_person))
         .route("/people/{id}", delete(delete_person))
@@ -738,8 +736,9 @@ pub async fn run(
         .route("/f/people/{id}", delete(fake))
         //
         .route("/entities", get(get_entities))
-        .route("/entities_old", get(get_entities_old))
         .route("/entities/{id}", get(get_entities))
+        .route("/entities_old", get(get_entities_old))
+        .route("/entities_old/{id}", get(get_entities_old))
         .route("/entities/{id}", put(create_update_entity))
         .route("/entities", post(create_update_entity))
         .route("/entities/{id}", delete(delete_entity))
@@ -753,8 +752,9 @@ pub async fn run(
         .route("/stocks/{id}", get(get_entity_stock))
         //
         .route("/products", get(get_products))
-        .route("/products_old", get(get_products_old))
         .route("/products/{id}", get(get_products))
+        .route("/products_old", get(get_products_old))
+        .route("/products_old/{id}", get(get_products_old))
         .route("/products/{id}", put(create_update_product))
         .route("/products", post(create_update_product))
         .route("/products/{id}", delete(delete_product))
@@ -768,6 +768,8 @@ pub async fn run(
         //
         .route("/storages", get(get_storages))
         .route("/storages/{id}", get(get_storages))
+        .route("/storages_old", get(get_storages_old))
+        .route("/storages_old/{id}", get(get_storages_old))
         .route("/storages/{id}", put(create_update_storage))
         .route("/storages", post(create_update_storage))
         .route("/storages/{id}", delete(delete_storage))
@@ -794,6 +796,7 @@ pub async fn run(
         .route("/pubchemproduct/{id}", post(pubchem_create_update_product))
         //
         .route("/products/casnumbers", get(get_cas_numbers))
+        .route("/products/casnumbers_old", get(get_cas_numbers_old))
         .route("/products/cenumbers", get(get_ce_numbers))
         .route("/products/names", get(get_names))
         .route("/products/linearformulas", get(get_linear_formulas))
