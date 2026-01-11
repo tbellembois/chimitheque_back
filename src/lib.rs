@@ -51,15 +51,13 @@ use crate::{
 };
 
 use axum::{
-    Extension, Json, Router,
+    Extension, Router,
     extract::{Request, State},
     http::HeaderMap,
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{delete, get, post, put},
 };
-use axum_extra::extract::Query;
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use casbin::{CoreApi, DefaultModel, Enforcer, StringAdapter};
 use chimitheque_db::{
     casbin::to_string_adapter,
@@ -69,18 +67,15 @@ use chimitheque_types::requestfilter::RequestFilter;
 use chrono::Local;
 use dashmap::DashMap;
 use governor::{Quota, RateLimiter};
-use http::{Method, StatusCode};
+use http::Method;
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use log::{debug, info};
 use once_cell::sync::OnceCell;
 use r2d2::{self};
 use r2d2_sqlite::SqliteConnectionManager;
-use rand::{Rng, distr::Alphanumeric};
 use rusqlite::Connection;
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use serde::Deserialize;
 use std::{
-    collections::HashMap,
     env,
     num::NonZeroU32,
     ops::{Deref, DerefMut},
@@ -95,21 +90,13 @@ use tower_sessions::{
     Expiry, MemoryStore, SessionManagerLayer,
     cookie::{SameSite, time::Duration},
 };
-use ureq::{Error, config::Config};
+use ureq::config::Config;
 use url::Url;
-use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct AuthContext {
     pub sub: String,   // claims sub
     pub email: String, // claims email
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct TokenResponse {
-    access_token: String,
-    refresh_token: String,
-    expires_in: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -124,19 +111,6 @@ struct Claims {
 }
 
 static JWKS_CACHE: OnceCell<Mutex<JwksCache>> = OnceCell::new();
-
-fn generate_code_verifier() -> String {
-    rand::rng()
-        .sample_iter(&Alphanumeric)
-        .take(64)
-        .map(char::from)
-        .collect()
-}
-
-fn generate_code_challenge(verifier: &str) -> String {
-    let hash = Sha256::digest(verifier.as_bytes());
-    URL_SAFE_NO_PAD.encode(hash)
-}
 
 #[derive(Clone)]
 pub struct AccessToken(pub String);
@@ -261,130 +235,6 @@ pub async fn jwt_middleware(
 
     // ✅ Continue to next middleware/handler
     next.run(req).await
-}
-
-#[derive(Serialize)]
-struct LoginResponse {
-    login_url: String,
-}
-
-// Browser → Keycloak login
-//         → redirect back with ?code=...
-//         → exchange code for tokens
-//         → call API with Bearer token
-// PKCE = one-time, per-authorization-request secret
-// One login attempt → one code_verifier
-// After token exchange → discard it
-async fn login(State(app_state): State<AppState>) -> Json<LoginResponse> {
-    debug!("login");
-
-    let verifier = generate_code_verifier();
-    let challenge = generate_code_challenge(&verifier);
-    let state = Uuid::new_v4().to_string();
-
-    let keycloak_auth_url = format!(
-        "{}/realms/{}/protocol/openid-connect/auth",
-        app_state.keycloak_base_url, app_state.keycloak_realm
-    );
-    let keycloak_client_id = app_state.keycloak_client_id;
-    let keycloak_redirect_url = app_state.keycloak_redirect_url;
-
-    let pkce_store = app_state.pkce_store.lock().await;
-
-    pkce_store.insert(state.clone(), verifier);
-
-    let url = format!(
-        "{auth}?client_id={client}&response_type=code&scope=openid\
-         &redirect_uri={redirect}&code_challenge={challenge}\
-         &code_challenge_method=S256&state={state}",
-        auth = keycloak_auth_url,
-        client = keycloak_client_id,
-        redirect = urlencoding::encode(keycloak_redirect_url.as_str()),
-        challenge = challenge,
-        state = state,
-    );
-
-    Json(LoginResponse { login_url: url })
-}
-
-#[derive(Deserialize)]
-struct LogoutRequest {
-    refresh_token: String,
-}
-
-async fn logout(
-    State(app_state): State<AppState>,
-    Json(payload): Json<LogoutRequest>,
-) -> StatusCode {
-    debug!("logout");
-
-    let revoke_url = format!(
-        "{}/realms/{}/protocol/openid-connect/revoke",
-        app_state.keycloak_base_url, app_state.keycloak_realm
-    );
-
-    match ureq::post(revoke_url).send_form([
-        ("token", payload.refresh_token.as_str()),
-        ("client_id", app_state.keycloak_client_id.as_str()),
-        ("token_type_hint", "refresh_token"),
-    ]) {
-        Ok(_) => StatusCode::NO_CONTENT,
-        Err(Error::StatusCode(code)) => {
-            dbg!(code);
-            return http::StatusCode::from_u16(code).unwrap();
-        }
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
-    };
-
-    // RFC 7009: success may return 200 or 204
-    StatusCode::NO_CONTENT
-}
-
-async fn callback(
-    State(app_state): State<AppState>,
-    Query(params): Query<HashMap<String, String>>,
-) -> Result<Json<TokenResponse>, StatusCode> {
-    debug!("callback");
-
-    let code = params.get("code").ok_or(StatusCode::BAD_REQUEST)?;
-    let state = params.get("state").ok_or(StatusCode::BAD_REQUEST)?;
-
-    let keycloak_token_url = format!(
-        "{}/realms/{}/protocol/openid-connect/token",
-        app_state.keycloak_base_url, app_state.keycloak_realm
-    );
-    let keycloak_client_id = app_state.keycloak_client_id.as_str();
-    let keycloak_redirect_url = app_state.keycloak_redirect_url.as_str();
-
-    let pkce_store = app_state.pkce_store.lock().await;
-
-    // --- Take PKCE verifier and drop the lock ASAP ---
-    let verifier = pkce_store
-        .remove(state)
-        .map(|(_, v)| v)
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    let token = match ureq::post(keycloak_token_url).send_form([
-        ("grant_type", "authorization_code"),
-        ("client_id", keycloak_client_id),
-        ("code", code),
-        ("redirect_uri", keycloak_redirect_url),
-        ("code_verifier", &verifier),
-    ]) {
-        Ok(mut response) => response.body_mut().read_json::<TokenResponse>().unwrap(),
-        Err(Error::StatusCode(code)) => {
-            dbg!(code);
-            return Err(http::StatusCode::from_u16(code).unwrap());
-        }
-        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
-    };
-
-    // ✅ Return tokens (or forward them securely to the CLI / app)
-    Ok(Json(TokenResponse {
-        access_token: token.access_token,
-        refresh_token: token.refresh_token,
-        expires_in: token.expires_in,
-    }))
 }
 
 // Extract OIDC claims from the request.
@@ -881,9 +731,6 @@ pub async fn run(
             state.clone(),
             jwt_middleware,
         ))
-        .route("/auth/login", post(login))
-        .route("/auth/callback", get(callback))
-        .route("/auth/logout", post(logout))
         .layer(Extension(http_client))
         // .layer(middleware::from_fn_with_state(state.clone(), my_middleware))
         .layer(session_layer)
