@@ -69,7 +69,7 @@ use dashmap::DashMap;
 use governor::{Quota, RateLimiter};
 use http::Method;
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
-use log::{debug, info};
+use log::{debug, error, info};
 use once_cell::sync::OnceCell;
 use r2d2::{self};
 use r2d2_sqlite::SqliteConnectionManager;
@@ -136,19 +136,22 @@ struct JwksCache {
 }
 
 // Refresh JWKS from Keycloak
-fn refresh_jwks(http_client: &Arc<ureq::Agent>, keycloak_base_url: String) -> JwksCache {
+fn refresh_jwks(
+    http_client: &Arc<ureq::Agent>,
+    keycloak_base_url: String,
+) -> Result<JwksCache, AppError> {
     let url = format!(
         "{}/realms/chimitheque/protocol/openid-connect/certs",
         keycloak_base_url
     );
 
-    http_client
-        .get(url)
-        .call()
-        .unwrap()
-        .body_mut()
-        .read_json::<JwksCache>()
-        .unwrap()
+    match http_client.get(url).call() {
+        Ok(mut response) => match response.body_mut().read_json::<JwksCache>() {
+            Ok(jwks) => Ok(jwks),
+            Err(err) => Err(AppError::DecodeJWKS(err.to_string())),
+        },
+        Err(err) => Err(AppError::CertificatesRetrieval(err.to_string())),
+    }
 }
 
 pub async fn jwt_middleware(
@@ -188,8 +191,16 @@ pub async fn jwt_middleware(
     // Get JWKS cache
     // The JSON Web Key Set (JWKS) is a set of keys containing the public keys used to verify any issued by the and signed using the RS256 signing algorithm.
     let cache = JWKS_CACHE.get_or_init(|| {
+        let keys = match refresh_jwks(&http_client, state.keycloak_base_url.clone()) {
+            Ok(jwks_cache) => jwks_cache.keys,
+            Err(err) => {
+                error!("{}", AppError::RefreshJWKS(err.to_string()));
+                vec![]
+            }
+        };
+
         Mutex::new(JwksCache {
-            keys: refresh_jwks(&http_client, state.keycloak_base_url.clone()).keys,
+            keys,
             last_updated: std::time::Instant::now(),
         })
     });
@@ -199,7 +210,12 @@ pub async fn jwt_middleware(
     // Refresh JWKS if older than 10 minutes or kid not found.
     let kid_found = jwks_lock.keys.iter().any(|k| k.kid == kid);
     if !kid_found || jwks_lock.last_updated.elapsed() > std::time::Duration::from_secs(600) {
-        jwks_lock.keys = refresh_jwks(&http_client, state.keycloak_base_url.clone()).keys;
+        let keys = match refresh_jwks(&http_client, state.keycloak_base_url.clone()) {
+            Ok(jwks_cache) => jwks_cache.keys,
+            Err(err) => return AppError::RefreshJWKS(err.to_string()).into_response(),
+        };
+
+        jwks_lock.keys = keys;
         jwks_lock.last_updated = std::time::Instant::now();
     }
 

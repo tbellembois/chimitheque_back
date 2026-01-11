@@ -44,6 +44,12 @@ pub enum AppError {
     RSAJWKNotFoundInCache(String),
     #[error("claims decoding: {0}")]
     ClaimsDecoding(String),
+    #[error("certificates retrieval error: {0}")]
+    CertificatesRetrieval(String),
+    #[error("decode jwks error: {0}")]
+    DecodeJWKS(String),
+    #[error("refresh jwks error: {0}")]
+    RefreshJWKS(String),
 }
 
 impl IntoResponse for AppError {
@@ -120,6 +126,18 @@ impl IntoResponse for AppError {
             AppError::RSAJWKNotFoundInCache(kid) => (
                 StatusCode::UNAUTHORIZED,
                 AppError::RSAJWKNotFoundInCache(kid).to_string(),
+            ),
+            AppError::CertificatesRetrieval(s) => (
+                StatusCode::UNAUTHORIZED,
+                AppError::CertificatesRetrieval(s).to_string(),
+            ),
+            AppError::DecodeJWKS(s) => (
+                StatusCode::UNAUTHORIZED,
+                AppError::DecodeJWKS(s).to_string(),
+            ),
+            AppError::RefreshJWKS(s) => (
+                StatusCode::UNAUTHORIZED,
+                AppError::RefreshJWKS(s).to_string(),
             ),
         };
         (status, body).into_response()
