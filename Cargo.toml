@@ -43,3 +43,4 @@ chimitheque_db = { path = "../chimitheque_db" }
 chimitheque_types = { path = "../chimitheque_types" }
 chimitheque_pubchem = { path = "../chimitheque_pubchem" }
 once_cell = "1.21.3"
+regex = "1.12.2"

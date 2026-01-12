@@ -62,6 +62,7 @@ use casbin::{CoreApi, DefaultModel, Enforcer, StringAdapter};
 use chimitheque_db::{
     casbin::to_string_adapter,
     init::{init_db, update_ghs_statements},
+    person::{get_admins, set_person_admin, unset_person_admin},
 };
 use chimitheque_types::requestfilter::RequestFilter;
 use chrono::Local;
@@ -73,6 +74,7 @@ use log::{debug, error, info};
 use once_cell::sync::OnceCell;
 use r2d2::{self};
 use r2d2_sqlite::SqliteConnectionManager;
+use regex::Regex;
 use rusqlite::Connection;
 use serde::Deserialize;
 use std::{
@@ -443,6 +445,7 @@ async fn _debug_middleware(
 
 pub async fn run(
     db_path: String,
+    admins: String,
     keycloak_base_url: String,
     keycloak_redirect_url: String,
     keycloak_realm: String,
@@ -502,6 +505,75 @@ pub async fn run(
         update_ghs_statements(&db_transaction).unwrap();
 
         db_transaction.commit().unwrap();
+    }
+
+    // Capture command line admins - add admin@chimitheque.fr.
+    let re = Regex::new(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b").unwrap();
+    let mut command_line_admins: Vec<&str> =
+        re.find_iter(admins.as_str()).map(|m| m.as_str()).collect();
+    command_line_admins.push("admin@chimitheque.fr");
+
+    info!("command line admins: {:#?}", command_line_admins);
+
+    // Getting current admins emails.
+    let current_admins: Vec<String> = get_admins(db_connection.deref_mut())
+        .unwrap()
+        .iter()
+        .map(|p| p.person_email.clone())
+        .collect();
+
+    info!("current admins: {:#?}", current_admins);
+
+    // Adding new admins.
+    for command_line_admin in command_line_admins.iter() {
+        debug!("command line admin: {}", command_line_admin);
+
+        if !current_admins.contains(&command_line_admin.to_string()) {
+            let person_id = chimitheque_db::person::get_people(
+                db_connection.deref_mut(),
+                RequestFilter {
+                    person_email: Some(command_line_admin.to_string()),
+                    ..Default::default()
+                },
+                1,
+            )
+            .unwrap()
+            .0
+            .first()
+            .unwrap()
+            .person_id
+            .unwrap();
+
+            info!("adding new admin: {}", command_line_admin);
+            set_person_admin(db_connection.deref_mut(), person_id).unwrap();
+        } else {
+            info!("{} is already an admin", command_line_admin);
+        }
+    }
+
+    // Removing former admins.
+    for current_admin in current_admins.iter() {
+        debug!("current_admin admin: {}", current_admin);
+
+        if !command_line_admins.contains(&current_admin.as_str()) {
+            let person_id = chimitheque_db::person::get_people(
+                db_connection.deref_mut(),
+                RequestFilter {
+                    person_email: Some(current_admin.to_string()),
+                    ..Default::default()
+                },
+                1,
+            )
+            .unwrap()
+            .0
+            .first()
+            .unwrap()
+            .person_id
+            .unwrap();
+
+            info!("removing admin: {}", current_admin);
+            unset_person_admin(db_connection.deref_mut(), person_id).unwrap();
+        }
     }
 
     let session_store = MemoryStore::default();
