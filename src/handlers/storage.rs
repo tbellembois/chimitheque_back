@@ -80,10 +80,28 @@ pub async fn get_storages_old(
     }
 }
 
+#[derive(Deserialize)]
+pub struct CreateUpdateStorageQueryParameters {
+    #[serde(default = "default_nb_items")]
+    nb_items: u64,
+    #[serde(default)]
+    identical_barecode: bool,
+}
+
+fn default_nb_items() -> u64 {
+    1
+}
+
+#[derive(Deserialize)]
+pub struct CreateUpdateStoragePathParameters {
+    #[serde(default)]
+    id: u64,
+}
+
 pub async fn create_update_storage(
     State(state): State<AppState>,
-    Query(nb_items): Query<u64>,
-    Query(identical_barecode): Query<bool>,
+    Query(query_params): Query<CreateUpdateStorageQueryParameters>,
+    Path(path_params): Path<CreateUpdateStoragePathParameters>,
     Json(storage): Json<Storage>,
 ) -> Result<Json<Vec<u64>>, AppError> {
     // Get the connection from the database.
@@ -96,11 +114,16 @@ pub async fn create_update_storage(
         return Err(AppError::InputValidation(err.to_string()));
     };
 
+    // update?
+    if path_params.id > 0 {
+        storage.storage_id = Some(path_params.id);
+    }
+
     let mayerr_storage_id = chimitheque_db::storage::create_update_storage(
         db_connection.deref_mut(),
         storage,
-        nb_items,
-        identical_barecode,
+        query_params.nb_items,
+        query_params.identical_barecode,
     );
 
     match mayerr_storage_id {

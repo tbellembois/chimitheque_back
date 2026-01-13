@@ -108,8 +108,15 @@ pub async fn get_people_old(
     }
 }
 
+#[derive(Deserialize)]
+pub struct CreateUpdatePersonPathParameters {
+    #[serde(default)]
+    id: u64,
+}
+
 pub async fn create_update_person(
     State(state): State<AppState>,
+    Path(path_params): Path<CreateUpdatePersonPathParameters>,
     Json(person): Json<Person>,
 ) -> Result<Json<u64>, AppError> {
     // Get the connection from the database.
@@ -121,6 +128,11 @@ pub async fn create_update_person(
     if let Err(err) = person.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
     };
+
+    // update?
+    if path_params.id > 0 {
+        person.person_id = Some(path_params.id);
+    }
 
     let mayerr_person_id =
         chimitheque_db::person::create_update_person(db_connection.deref_mut(), person);

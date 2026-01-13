@@ -70,7 +70,7 @@ use dashmap::DashMap;
 use governor::{Quota, RateLimiter};
 use http::Method;
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
-use log::{debug, error, info};
+use log::{debug, info};
 use once_cell::sync::OnceCell;
 use r2d2::{self};
 use r2d2_sqlite::SqliteConnectionManager;
@@ -147,6 +147,8 @@ fn refresh_jwks(
         keycloak_base_url
     );
 
+    debug!("url: {}", url);
+
     match http_client.get(url).call() {
         Ok(mut response) => match response.body_mut().read_json::<JwksCache>() {
             Ok(jwks) => Ok(jwks),
@@ -193,16 +195,8 @@ pub async fn jwt_middleware(
     // Get JWKS cache
     // The JSON Web Key Set (JWKS) is a set of keys containing the public keys used to verify any issued by the and signed using the RS256 signing algorithm.
     let cache = JWKS_CACHE.get_or_init(|| {
-        let keys = match refresh_jwks(&http_client, state.keycloak_base_url.clone()) {
-            Ok(jwks_cache) => jwks_cache.keys,
-            Err(err) => {
-                error!("{}", AppError::RefreshJWKS(err.to_string()));
-                vec![]
-            }
-        };
-
         Mutex::new(JwksCache {
-            keys,
+            keys: vec![],
             last_updated: std::time::Instant::now(),
         })
     });

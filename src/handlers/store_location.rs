@@ -81,8 +81,15 @@ pub async fn get_store_locations_old(
     }
 }
 
+#[derive(Deserialize)]
+pub struct CreateUpdateStoreLocationPathParameters {
+    #[serde(default)]
+    id: u64,
+}
+
 pub async fn create_update_store_location(
     State(state): State<AppState>,
+    Path(path_params): Path<CreateUpdateStoreLocationPathParameters>,
     Json(store_location): Json<StoreLocation>,
 ) -> Result<Json<u64>, AppError> {
     // Get the connection from the database.
@@ -94,6 +101,11 @@ pub async fn create_update_store_location(
     if let Err(err) = store_location.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
     };
+
+    // update?
+    if path_params.id > 0 {
+        store_location.store_location_id = Some(path_params.id);
+    }
 
     let mayerr_store_location_id = chimitheque_db::storelocation::create_update_store_location(
         db_connection.deref_mut(),

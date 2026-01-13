@@ -79,8 +79,15 @@ pub async fn get_entities_old(
     }
 }
 
+#[derive(Deserialize)]
+pub struct CreateUpdateEntityPathParameters {
+    #[serde(default)]
+    id: u64,
+}
+
 pub async fn create_update_entity(
     State(state): State<AppState>,
+    Path(path_params): Path<CreateUpdateEntityPathParameters>,
     Json(entity): Json<Entity>,
 ) -> Result<Json<u64>, AppError> {
     // Get the connection from the database.
@@ -92,6 +99,11 @@ pub async fn create_update_entity(
     if let Err(err) = entity.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
     };
+
+    // update?
+    if path_params.id > 0 {
+        entity.entity_id = Some(path_params.id);
+    }
 
     let mayerr_entity_id =
         chimitheque_db::entity::create_update_entity(db_connection.deref_mut(), entity);

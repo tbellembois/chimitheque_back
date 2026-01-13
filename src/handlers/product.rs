@@ -82,8 +82,15 @@ pub async fn get_products_old(
     }
 }
 
+#[derive(Deserialize)]
+pub struct CreateUpdateProductPathParameters {
+    #[serde(default)]
+    id: u64,
+}
+
 pub async fn create_update_product(
     State(state): State<AppState>,
+    Path(path_params): Path<CreateUpdateProductPathParameters>,
     Json(product): Json<Product>,
 ) -> Result<Json<u64>, AppError> {
     // Get the connection from the database.
@@ -95,6 +102,11 @@ pub async fn create_update_product(
     if let Err(err) = product.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
     };
+
+    // update?
+    if path_params.id > 0 {
+        product.product_id = Some(path_params.id);
+    }
 
     let mayerr_product_id =
         chimitheque_db::product::create_update_product(db_connection.deref_mut(), product);
