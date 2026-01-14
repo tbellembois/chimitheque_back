@@ -27,7 +27,6 @@ pub struct AppState {
     pub rate_limiter: Arc<RateLimiter<NotKeyed, InMemoryState, QuantaClock, NoOpMiddleware>>,
 
     pub keycloak_base_url: String,
-    pub keycloak_redirect_url: String,
     pub keycloak_client_id: String,
     pub keycloak_realm: String,
 

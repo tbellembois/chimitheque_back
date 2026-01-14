@@ -441,7 +441,6 @@ pub async fn run(
     db_path: String,
     admins: String,
     keycloak_base_url: String,
-    keycloak_redirect_url: String,
     keycloak_realm: String,
     client_id: String,
 ) {
@@ -596,7 +595,6 @@ pub async fn run(
         db_connection_pool: Arc::new(db_connection_pool),
         rate_limiter: Arc::new(rate_limiter),
         keycloak_client_id: client_id,
-        keycloak_redirect_url,
         keycloak_realm,
         keycloak_base_url,
         pkce_store: Arc::new(Mutex::new(DashMap::new())),
@@ -720,17 +718,26 @@ pub async fn run(
         .route("/f/storages", post(fake))
         .route("/f/storages/{id}", delete(fake))
         //
-        .route("/pubchemautocomplete/{name}", get(pubchem_autocomplete))
         .route(
-            "/pubchemgetcompoundbyname/{name}",
+            "/products/pubchemautocomplete/{name}",
+            get(pubchem_autocomplete),
+        )
+        .route(
+            "/products/pubchemgetcompoundbyname/{name}",
             get(pubchem_getcompoundbyname),
         )
         .route(
-            "/pubchemgetproductbyname/{name}",
+            "/products/pubchemgetproductbyname/{name}",
             get(pubchem_getproductbyname),
         )
-        .route("/pubchemproduct", post(pubchem_create_update_product))
-        .route("/pubchemproduct/{id}", post(pubchem_create_update_product))
+        .route(
+            "/products/pubchemproduct",
+            post(pubchem_create_update_product),
+        )
+        .route(
+            "/products/pubchemproduct/{id}",
+            post(pubchem_create_update_product),
+        )
         //
         .route("/storages/units", get(get_units))
         .route("/storages/units_old", get(get_units_old))
