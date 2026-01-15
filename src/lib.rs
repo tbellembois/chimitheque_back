@@ -442,7 +442,7 @@ pub async fn run(
     admins: String,
     keycloak_base_url: String,
     keycloak_realm: String,
-    client_id: String,
+    keycloak_client_id: String,
 ) {
     // Initialize logger.
     env_logger::builder()
@@ -594,7 +594,7 @@ pub async fn run(
         casbin_enforcer,
         db_connection_pool: Arc::new(db_connection_pool),
         rate_limiter: Arc::new(rate_limiter),
-        keycloak_client_id: client_id,
+        keycloak_client_id,
         keycloak_realm,
         keycloak_base_url,
         pkce_store: Arc::new(Mutex::new(DashMap::new())),
