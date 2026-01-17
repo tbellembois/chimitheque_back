@@ -579,7 +579,9 @@ pub async fn run(
     info!("initialize casbin");
 
     let casbin_string_adapter = to_string_adapter(db_connection.deref()).unwrap();
-    let casbin_model = DefaultModel::from_file("casbin/policy.conf").await.unwrap();
+    let casbin_model = DefaultModel::from_str(include_str!("casbin/policy.conf"))
+        .await
+        .unwrap();
     let casbin_adapter = StringAdapter::new(casbin_string_adapter.clone());
     let casbin_enforcer = Arc::new(Mutex::new(
         Enforcer::new(casbin_model, casbin_adapter).await.unwrap(),
