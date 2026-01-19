@@ -100,7 +100,7 @@ pub struct CreateUpdateStoragePathParameters {
 
 pub async fn create_update_storage(
     State(state): State<AppState>,
-    Query(query_params): Query<CreateUpdateStorageQueryParameters>,
+    Query(mut query_params): Query<CreateUpdateStorageQueryParameters>,
     Path(path_params): Path<CreateUpdateStoragePathParameters>,
     Json(storage): Json<Storage>,
 ) -> Result<Json<Vec<u64>>, AppError> {
@@ -117,6 +117,11 @@ pub async fn create_update_storage(
     // update?
     if path_params.id > 0 {
         storage.storage_id = Some(path_params.id);
+    }
+
+    // Ensure nb_items not zero.
+    if query_params.nb_items == 0 {
+        query_params.nb_items = 1;
     }
 
     let mayerr_storage_id = chimitheque_db::storage::create_update_storage(
