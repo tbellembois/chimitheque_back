@@ -64,7 +64,7 @@ use chimitheque_db::{
     init::{init_db, update_ghs_statements},
     person::{get_admins, set_person_admin, unset_person_admin},
 };
-use chimitheque_types::requestfilter::RequestFilter;
+use chimitheque_types::{person::Person, requestfilter::RequestFilter};
 use chrono::Local;
 use dashmap::DashMap;
 use governor::{Quota, RateLimiter};
@@ -259,12 +259,9 @@ async fn authenticate_middleware(
 ) -> Response {
     debug!("authenticate_middleware");
 
-    if request.uri().path() == "/login" {
-        return next.run(request).await;
-    }
+    let mut db_connection = state.db_connection_pool.get().unwrap();
 
-    let db_connection = state.db_connection_pool.get().unwrap();
-
+    // Check that the clails contains the user email.
     if auth.email.is_empty() {
         return AppError::MissingEmailInClaims.into_response();
     };
@@ -273,7 +270,7 @@ async fn authenticate_middleware(
     let (people, _) = match chimitheque_db::person::get_people(
         db_connection.deref(),
         RequestFilter {
-            person_email: Some(auth.email),
+            person_email: Some(auth.email.clone()),
             ..Default::default()
         },
         1,
@@ -282,8 +279,26 @@ async fn authenticate_middleware(
         Err(err) => return AppError::Database(err.to_string()).into_response(),
     };
 
-    // We trust the result from get_people and then expect one result that is not None.
-    let person = people.first().unwrap();
+    // Creating new person if needed.
+    let person = match people.first() {
+        Some(person) => person,
+        None => {
+            let mut new_person = Person {
+                person_email: auth.email,
+                ..Default::default()
+            };
+            match chimitheque_db::person::create_update_person(
+                db_connection.deref_mut(),
+                new_person.clone(),
+            ) {
+                Ok(person_id) => {
+                    new_person.person_id = Some(person_id);
+                    &new_person.clone()
+                }
+                Err(err) => return AppError::Database(err.to_string()).into_response(),
+            }
+        }
+    };
 
     request.headers_mut().insert(
         "chimitheque_person_id",
