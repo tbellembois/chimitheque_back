@@ -115,7 +115,7 @@ pub struct CreateUpdatePersonPathParameters {
 }
 
 pub async fn create_update_person(
-    State(state): State<AppState>,
+    State(mut state): State<AppState>,
     Path(path_params): Path<CreateUpdatePersonPathParameters>,
     Json(person): Json<Person>,
 ) -> Result<Json<u64>, AppError> {
@@ -137,6 +137,8 @@ pub async fn create_update_person(
     let mayerr_person_id =
         chimitheque_db::person::create_update_person(db_connection.deref_mut(), person);
 
+    state.init_casbin_enforcer().await?;
+
     match mayerr_person_id {
         Ok(person_id) => Ok(Json(person_id)),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -144,12 +146,14 @@ pub async fn create_update_person(
 }
 
 pub async fn delete_person(
-    State(state): State<AppState>,
+    State(mut state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
+
+    state.init_casbin_enforcer().await?;
 
     match chimitheque_db::person::delete_person(db_connection.deref_mut(), id) {
         Ok(_) => Ok(()),

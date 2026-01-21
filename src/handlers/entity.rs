@@ -86,7 +86,7 @@ pub struct CreateUpdateEntityPathParameters {
 }
 
 pub async fn create_update_entity(
-    State(state): State<AppState>,
+    State(mut state): State<AppState>,
     Path(path_params): Path<CreateUpdateEntityPathParameters>,
     Json(entity): Json<Entity>,
 ) -> Result<Json<u64>, AppError> {
@@ -108,6 +108,8 @@ pub async fn create_update_entity(
     let mayerr_entity_id =
         chimitheque_db::entity::create_update_entity(db_connection.deref_mut(), entity);
 
+    state.init_casbin_enforcer().await?;
+
     match mayerr_entity_id {
         Ok(entity_id) => Ok(Json(entity_id)),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -115,12 +117,14 @@ pub async fn create_update_entity(
 }
 
 pub async fn delete_entity(
-    State(state): State<AppState>,
+    State(mut state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
+
+    state.init_casbin_enforcer().await?;
 
     match chimitheque_db::entity::delete_entity(db_connection.deref_mut(), id) {
         Ok(_) => Ok(()),

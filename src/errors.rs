@@ -14,6 +14,8 @@ pub enum AppError {
     ParseEmail(String),
     #[error("database: {0}")]
     Database(String),
+    #[error("database pool: {0}")]
+    DatabasePool(String),
     #[error("invalid first path segment: {0:?}")]
     InvalidFirstPathSegment(Option<String>),
     #[error("chimitheque person id header missing")]
@@ -70,6 +72,10 @@ impl IntoResponse for AppError {
             AppError::Database(s) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 AppError::Database(s).to_string(),
+            ),
+            AppError::DatabasePool(s) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                AppError::DatabasePool(s).to_string(),
             ),
             AppError::ChimithequePersonIdHeaderMissing => (
                 StatusCode::FORBIDDEN,

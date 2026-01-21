@@ -1,9 +1,11 @@
-use casbin::{CoreApi, Enforcer, function_map::OperatorFunction, rhai::Dynamic};
+use casbin::{
+    CoreApi, DefaultModel, Enforcer, StringAdapter, function_map::OperatorFunction, rhai::Dynamic,
+};
 use chimitheque_db::casbin::{
     match_entity_has_members, match_person_is_admin, match_person_is_in_entity,
     match_person_is_manager, match_product_has_storages, match_storage_is_in_entity,
     match_store_location_has_children, match_store_location_has_storages,
-    match_store_location_is_in_entity,
+    match_store_location_is_in_entity, to_string_adapter,
 };
 use dashmap::DashMap;
 use governor::{
@@ -17,6 +19,8 @@ use r2d2::{self, Pool};
 use r2d2_sqlite::SqliteConnectionManager;
 use std::{ops::Deref, sync::Arc};
 use tokio::sync::Mutex;
+
+use crate::errors::AppError;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -34,7 +38,32 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn set_enforcer(&mut self) {
+    pub async fn init_casbin_enforcer(&mut self) -> Result<(), AppError> {
+        let db_connection_pool = self.db_connection_pool.clone();
+
+        let db_connection = match db_connection_pool.get() {
+            Ok(db_connection) => db_connection,
+            Err(err) => return Err(AppError::DatabasePool(err.to_string())),
+        };
+
+        let casbin_string_adapter = to_string_adapter(db_connection.deref()).unwrap();
+        let casbin_model = DefaultModel::from_str(include_str!("casbin/policy.conf"))
+            .await
+            .unwrap();
+        let casbin_adapter = StringAdapter::new(casbin_string_adapter.clone());
+        let casbin_enforcer = Arc::new(Mutex::new(
+            Enforcer::new(casbin_model, casbin_adapter).await.unwrap(),
+        ));
+
+        self.casbin_enforcer = casbin_enforcer;
+
+        // Adding functions.
+        self.add_casbin_functions().await;
+
+        Ok(())
+    }
+
+    pub async fn add_casbin_functions(&mut self) {
         let db_connection_pool_1 = self.db_connection_pool.clone();
         let db_connection_pool_2 = db_connection_pool_1.clone();
         let db_connection_pool_3 = db_connection_pool_1.clone();

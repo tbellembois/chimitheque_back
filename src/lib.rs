@@ -58,10 +58,9 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{delete, get, post, put},
 };
-use casbin::{CoreApi, DefaultModel, Enforcer, StringAdapter};
+use casbin::{CoreApi, DefaultModel, Enforcer, NullAdapter};
 use chimitheque_db::{
-    casbin::to_string_adapter,
-    init::{init_db, update_ghs_statements},
+    init::init_db,
     person::{get_admins, set_person_admin, unset_person_admin},
 };
 use chimitheque_types::{person::Person, requestfilter::RequestFilter};
@@ -77,14 +76,13 @@ use r2d2_sqlite::SqliteConnectionManager;
 use regex::Regex;
 use rusqlite::Connection;
 use serde::Deserialize;
+use std::io::Write;
 use std::{
     env,
     num::NonZeroU32,
     ops::{Deref, DerefMut},
-    path::Path,
     sync::Arc,
 };
-use std::{io::Write, os::unix::fs::MetadataExt};
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
@@ -495,25 +493,10 @@ pub async fn run(
         });
 
     let db_connection_pool = r2d2::Pool::builder().build(manager).unwrap();
-
-    // Load extensions.
     let mut db_connection = db_connection_pool.get().unwrap();
 
-    // Check that DB file exist, create if not.
-    if Path::new(&db_path).metadata().unwrap().size() == 0 {
-        info!("initialize DB");
-
-        init_db(db_connection.deref_mut()).unwrap();
-    } else {
-        // Updating statements on already existing DB - panic on failure.
-        let db_transaction = db_connection.transaction().unwrap();
-
-        info!("updating GHS statements");
-
-        update_ghs_statements(&db_transaction).unwrap();
-
-        db_transaction.commit().unwrap();
-    }
+    // Initialize database;
+    init_db(db_connection.deref_mut()).unwrap();
 
     // Capture command line admins - add admin@chimitheque.fr.
     let re = Regex::new(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b").unwrap();
@@ -590,36 +573,33 @@ pub async fn run(
         .with_same_site(SameSite::Lax)
         .with_expiry(Expiry::OnInactivity(Duration::seconds(120)));
 
-    // Initialize the Casbin toolkit.
-    info!("initialize casbin");
-
-    let casbin_string_adapter = to_string_adapter(db_connection.deref()).unwrap();
-    let casbin_model = DefaultModel::from_str(include_str!("casbin/policy.conf"))
-        .await
-        .unwrap();
-    let casbin_adapter = StringAdapter::new(casbin_string_adapter.clone());
-    let casbin_enforcer = Arc::new(Mutex::new(
-        Enforcer::new(casbin_model, casbin_adapter).await.unwrap(),
-    ));
-
     // Initialize rate limiter for pubchem requests.
     info!("initialize the request rate limiter");
 
     let rate_limiter = RateLimiter::direct(Quota::per_second(NonZeroU32::new(5).unwrap()));
 
+    // Temporary Casbin model and adapter for state initialization.
+    let empty_casbin_model = DefaultModel::from_str("").await.unwrap();
+    let empty_casbin_adapter = NullAdapter;
+
     let mut state = AppState {
-        casbin_enforcer,
         db_connection_pool: Arc::new(db_connection_pool),
         rate_limiter: Arc::new(rate_limiter),
         keycloak_client_id,
         keycloak_realm,
         keycloak_base_url,
         pkce_store: Arc::new(Mutex::new(DashMap::new())),
+        casbin_enforcer: Arc::new(Mutex::new(
+            Enforcer::new(empty_casbin_model, empty_casbin_adapter)
+                .await
+                .unwrap(),
+        )),
     };
 
-    info!("loading casbin enforcer functions");
+    // Initialize the state Casbin.
+    info!("initialize casbin");
 
-    state.set_enforcer().await;
+    state.init_casbin_enforcer().await.unwrap();
 
     //     requests
     //        |
