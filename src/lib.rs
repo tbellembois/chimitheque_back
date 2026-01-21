@@ -4,7 +4,7 @@ pub mod handlers;
 pub mod utils;
 
 use crate::{
-    appstate::AppState,
+    appstate::{AppState, init_casbin_enforcer},
     errors::AppError,
     handlers::{
         bookmark::toogle_bookmark,
@@ -582,7 +582,7 @@ pub async fn run(
     let empty_casbin_model = DefaultModel::from_str("").await.unwrap();
     let empty_casbin_adapter = NullAdapter;
 
-    let mut state = AppState {
+    let state = AppState {
         db_connection_pool: Arc::new(db_connection_pool),
         rate_limiter: Arc::new(rate_limiter),
         keycloak_client_id,
@@ -598,8 +598,12 @@ pub async fn run(
 
     // Initialize the state Casbin.
     info!("initialize casbin");
-
-    state.init_casbin_enforcer().await.unwrap();
+    init_casbin_enforcer(
+        state.casbin_enforcer.clone(),
+        state.db_connection_pool.clone(),
+    )
+    .await
+    .unwrap();
 
     //     requests
     //        |
@@ -822,6 +826,8 @@ pub async fn run(
         .layer(session_layer)
         .layer(cors)
         .with_state(state);
+    // with_state(state) moves the state into the router, and Axum clones it per request.
+    // If your state is a normal struct, each handler gets its own copy, so possible mutations are not global.
 
     info!("running server");
 

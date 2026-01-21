@@ -7,7 +7,10 @@ use chimitheque_types::{entity::Entity, requestfilter::RequestFilter, stock::Sto
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
-use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
+use crate::{
+    AppState, appstate::init_casbin_enforcer, errors::AppError,
+    utils::get_chimitheque_person_id_from_headers,
+};
 
 pub async fn get_entities(
     State(state): State<AppState>,
@@ -86,7 +89,7 @@ pub struct CreateUpdateEntityPathParameters {
 }
 
 pub async fn create_update_entity(
-    State(mut state): State<AppState>,
+    State(state): State<AppState>,
     Path(path_params): Path<CreateUpdateEntityPathParameters>,
     Json(entity): Json<Entity>,
 ) -> Result<Json<u64>, AppError> {
@@ -108,7 +111,7 @@ pub async fn create_update_entity(
     let mayerr_entity_id =
         chimitheque_db::entity::create_update_entity(db_connection.deref_mut(), entity);
 
-    state.init_casbin_enforcer().await?;
+    init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
 
     match mayerr_entity_id {
         Ok(entity_id) => Ok(Json(entity_id)),
@@ -117,14 +120,14 @@ pub async fn create_update_entity(
 }
 
 pub async fn delete_entity(
-    State(mut state): State<AppState>,
+    State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
 
-    state.init_casbin_enforcer().await?;
+    init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
 
     match chimitheque_db::entity::delete_entity(db_connection.deref_mut(), id) {
         Ok(_) => Ok(()),

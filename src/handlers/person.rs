@@ -7,7 +7,10 @@ use chimitheque_types::{person::Person, requestfilter::RequestFilter};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
-use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
+use crate::{
+    AppState, appstate::init_casbin_enforcer, errors::AppError,
+    utils::get_chimitheque_person_id_from_headers,
+};
 
 pub async fn get_connected_user(
     State(state): State<AppState>,
@@ -115,7 +118,7 @@ pub struct CreateUpdatePersonPathParameters {
 }
 
 pub async fn create_update_person(
-    State(mut state): State<AppState>,
+    State(state): State<AppState>,
     Path(path_params): Path<CreateUpdatePersonPathParameters>,
     Json(person): Json<Person>,
 ) -> Result<Json<u64>, AppError> {
@@ -137,7 +140,7 @@ pub async fn create_update_person(
     let mayerr_person_id =
         chimitheque_db::person::create_update_person(db_connection.deref_mut(), person);
 
-    state.init_casbin_enforcer().await?;
+    init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
 
     match mayerr_person_id {
         Ok(person_id) => Ok(Json(person_id)),
@@ -146,14 +149,14 @@ pub async fn create_update_person(
 }
 
 pub async fn delete_person(
-    State(mut state): State<AppState>,
+    State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
 
-    state.init_casbin_enforcer().await?;
+    init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
 
     match chimitheque_db::person::delete_person(db_connection.deref_mut(), id) {
         Ok(_) => Ok(()),
