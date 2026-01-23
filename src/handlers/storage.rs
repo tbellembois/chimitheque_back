@@ -64,7 +64,8 @@ pub async fn get_storages_old(
         chimitheque_person_id,
     );
 
-    if request_filter.id.is_none() {
+    // hack: request_filter.limit == Some(1) -> QRCode scanner
+    if request_filter.id.is_none() || request_filter.limit == Some(1) {
         match mayerr_storages {
             Ok(storages) => Ok(Json(Box::new(GetStoragesOldResponse {
                 rows: storages.0,
@@ -180,7 +181,7 @@ pub async fn export_storages(
 
 pub async fn archive_storage(
     State(state): State<AppState>,
-    Query(id): Query<u64>,
+    Path(id): Path<u64>,
 ) -> Result<(), AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -194,7 +195,7 @@ pub async fn archive_storage(
 
 pub async fn unarchive_storage(
     State(state): State<AppState>,
-    Query(id): Query<u64>,
+    Path(id): Path<u64>,
 ) -> Result<(), AppError> {
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();

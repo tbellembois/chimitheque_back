@@ -687,6 +687,7 @@ pub async fn run(
         //
         .route("/stocks/{id}", get(get_entity_stock))
         //
+        .route("/products/export", get(export_products))
         .route("/products", get(get_products))
         .route("/products/{id}", get(get_products))
         .route("/products_old", get(get_products_old))
@@ -694,7 +695,6 @@ pub async fn run(
         .route("/products/{id}", put(create_update_product))
         .route("/products", post(create_update_product))
         .route("/products/{id}", delete(delete_product))
-        .route("/products/export", get(export_products))
         //
         .route("/f/products", get(fake))
         .route("/f/products/{id}", get(fake))
