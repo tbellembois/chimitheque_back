@@ -3,9 +3,8 @@ use chimitheque_db::searchable::get_many;
 use chimitheque_traits::searchable::Searchable;
 use chimitheque_types::{
     casnumber::CasNumber, category::Category, cenumber::CeNumber, classofcompound::ClassOfCompound,
-    empiricalformula::EmpiricalFormula, hazardstatement::HazardStatement,
-    linearformula::LinearFormula, name::Name, physicalstate::PhysicalState,
-    precautionarystatement::PrecautionaryStatement, producer::Producer, producerref::ProducerRef,
+    empiricalformula::EmpiricalFormula, linearformula::LinearFormula, name::Name,
+    physicalstate::PhysicalState, producer::Producer, producerref::ProducerRef,
     requestfilter::RequestFilter, signalword::SignalWord, supplier::Supplier,
     supplierref::SupplierRef, symbol::Symbol, tag::Tag, unit::Unit,
 };
@@ -505,10 +504,7 @@ pub async fn get_hazard_statements(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match get_many(
-        &HazardStatement {
-            ..Default::default()
-        },
+    match chimitheque_db::hazardstatement::get_hazard_statements(
         db_connection.deref(),
         request_filter,
     ) {
@@ -525,10 +521,7 @@ pub async fn get_hazard_statements_old(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match get_many(
-        &HazardStatement {
-            ..Default::default()
-        },
+    match chimitheque_db::hazardstatement::get_hazard_statements(
         db_connection.deref(),
         request_filter,
     ) {
@@ -548,10 +541,7 @@ pub async fn get_precautionary_statements(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match get_many(
-        &PrecautionaryStatement {
-            ..Default::default()
-        },
+    match chimitheque_db::precautionarystatement::get_precautionary_statements(
         db_connection.deref(),
         request_filter,
     ) {
@@ -568,10 +558,7 @@ pub async fn get_precautionary_statements_old(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match get_many(
-        &PrecautionaryStatement {
-            ..Default::default()
-        },
+    match chimitheque_db::precautionarystatement::get_precautionary_statements(
         db_connection.deref(),
         request_filter,
     ) {
