@@ -2,6 +2,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use log::error;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -57,94 +58,161 @@ pub enum AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, body) = match self {
-            AppError::ClaimsDecoding(s) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                AppError::ClaimsDecoding(s).to_string(),
-            ),
-            AppError::MissingEmailInClaims => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                AppError::MissingEmailInClaims.to_string(),
-            ),
-            AppError::ParseURI(s) => (StatusCode::BAD_REQUEST, AppError::ParseURI(s).to_string()),
+            AppError::ClaimsDecoding(s) => {
+                error!("ClaimsDecoding: {}", s);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    AppError::ClaimsDecoding(s).to_string(),
+                )
+            }
+            AppError::MissingEmailInClaims => {
+                error!("MissingEmailInClaims");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    AppError::MissingEmailInClaims.to_string(),
+                )
+            }
+            AppError::ParseURI(s) => {
+                error!("ParseURI: {}", s);
+                (StatusCode::BAD_REQUEST, AppError::ParseURI(s).to_string())
+            }
             AppError::ParseEmail(s) => {
+                error!("ParseEmail: {}", s);
                 (StatusCode::BAD_REQUEST, AppError::ParseEmail(s).to_string())
             }
-            AppError::Database(s) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                AppError::Database(s).to_string(),
-            ),
-            AppError::DatabasePool(s) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                AppError::DatabasePool(s).to_string(),
-            ),
-            AppError::ChimithequePersonIdHeaderMissing => (
-                StatusCode::FORBIDDEN,
-                AppError::ChimithequePersonIdHeaderMissing.to_string(),
-            ),
-            AppError::InvalidFirstPathSegment(s) => (
-                StatusCode::BAD_REQUEST,
-                AppError::InvalidFirstPathSegment(s).to_string(),
-            ),
-            AppError::ChimithequePersonIdHeaderInvalid(header_value) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                AppError::ChimithequePersonIdHeaderInvalid(header_value).to_string(),
-            ),
-            AppError::PermissionDenied => (
-                StatusCode::FORBIDDEN,
-                AppError::PermissionDenied.to_string(),
-            ),
-            AppError::CasbinError(err) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                AppError::CasbinError(err).to_string(),
-            ),
-            AppError::CasbinEnforcerLockFailed(s) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                AppError::CasbinEnforcerLockFailed(s).to_string(),
-            ),
-            AppError::InvalidPerson(s) => (
-                StatusCode::BAD_REQUEST,
-                AppError::InvalidPerson(s).to_string(),
-            ),
-            AppError::InvalidProduct(s) => (
-                StatusCode::BAD_REQUEST,
-                AppError::InvalidProduct(s).to_string(),
-            ),
-            AppError::InputValidation(s) => (
-                StatusCode::BAD_REQUEST,
-                AppError::InputValidation(s).to_string(),
-            ),
-            AppError::Pubchem(s) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                AppError::Pubchem(s).to_string(),
-            ),
-            AppError::BearerTokenMissing => (
-                StatusCode::UNAUTHORIZED,
-                AppError::BearerTokenMissing.to_string(),
-            ),
-            AppError::DecodeJWTHeader(s) => (
-                StatusCode::UNAUTHORIZED,
-                AppError::DecodeJWTHeader(s).to_string(),
-            ),
-            AppError::HeaderKIDMissing => (
-                StatusCode::UNAUTHORIZED,
-                AppError::HeaderKIDMissing.to_string(),
-            ),
-            AppError::RSAJWKNotFoundInCache(kid) => (
-                StatusCode::UNAUTHORIZED,
-                AppError::RSAJWKNotFoundInCache(kid).to_string(),
-            ),
-            AppError::CertificatesRetrieval(s) => (
-                StatusCode::UNAUTHORIZED,
-                AppError::CertificatesRetrieval(s).to_string(),
-            ),
-            AppError::DecodeJWKS(s) => (
-                StatusCode::UNAUTHORIZED,
-                AppError::DecodeJWKS(s).to_string(),
-            ),
-            AppError::RefreshJWKS(s) => (
-                StatusCode::UNAUTHORIZED,
-                AppError::RefreshJWKS(s).to_string(),
-            ),
+            AppError::Database(s) => {
+                error!("Database: {}", s);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    AppError::Database(s).to_string(),
+                )
+            }
+            AppError::DatabasePool(s) => {
+                error!("DatabasePool: {}", s);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    AppError::DatabasePool(s).to_string(),
+                )
+            }
+            AppError::ChimithequePersonIdHeaderMissing => {
+                error!("ChimithequePersonIdHeaderMissing");
+                (
+                    StatusCode::FORBIDDEN,
+                    AppError::ChimithequePersonIdHeaderMissing.to_string(),
+                )
+            }
+            AppError::InvalidFirstPathSegment(s) => {
+                error!("InvalidFirstPathSegment: {:?}", s);
+                (
+                    StatusCode::BAD_REQUEST,
+                    AppError::InvalidFirstPathSegment(s).to_string(),
+                )
+            }
+            AppError::ChimithequePersonIdHeaderInvalid(header_value) => {
+                error!("ChimithequePersonIdHeaderInvalid: {}", header_value);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    AppError::ChimithequePersonIdHeaderInvalid(header_value).to_string(),
+                )
+            }
+            AppError::PermissionDenied => {
+                error!("PermissionDenied");
+                (
+                    StatusCode::FORBIDDEN,
+                    AppError::PermissionDenied.to_string(),
+                )
+            }
+            AppError::CasbinError(err) => {
+                error!("CasbinError: {}", err);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    AppError::CasbinError(err).to_string(),
+                )
+            }
+            AppError::CasbinEnforcerLockFailed(s) => {
+                error!("CasbinEnforcerLockFailed: {}", s);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    AppError::CasbinEnforcerLockFailed(s).to_string(),
+                )
+            }
+            AppError::InvalidPerson(s) => {
+                error!("InvalidPerson: {}", s);
+                (
+                    StatusCode::BAD_REQUEST,
+                    AppError::InvalidPerson(s).to_string(),
+                )
+            }
+            AppError::InvalidProduct(s) => {
+                error!("InvalidProduct: {}", s);
+                (
+                    StatusCode::BAD_REQUEST,
+                    AppError::InvalidProduct(s).to_string(),
+                )
+            }
+            AppError::InputValidation(s) => {
+                error!("InputValidation: {}", s);
+                (
+                    StatusCode::BAD_REQUEST,
+                    AppError::InputValidation(s).to_string(),
+                )
+            }
+            AppError::Pubchem(s) => {
+                error!("Pubchem: {}", s);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    AppError::Pubchem(s).to_string(),
+                )
+            }
+            AppError::BearerTokenMissing => {
+                error!("BearerTokenMissing");
+                (
+                    StatusCode::UNAUTHORIZED,
+                    AppError::BearerTokenMissing.to_string(),
+                )
+            }
+            AppError::DecodeJWTHeader(s) => {
+                error!("DecodeJWTHeader: {}", s);
+                (
+                    StatusCode::UNAUTHORIZED,
+                    AppError::DecodeJWTHeader(s).to_string(),
+                )
+            }
+            AppError::HeaderKIDMissing => {
+                error!("HeaderKIDMissing");
+                (
+                    StatusCode::UNAUTHORIZED,
+                    AppError::HeaderKIDMissing.to_string(),
+                )
+            }
+            AppError::RSAJWKNotFoundInCache(kid) => {
+                error!("RSAJWKNotFoundInCache: {}", kid);
+                (
+                    StatusCode::UNAUTHORIZED,
+                    AppError::RSAJWKNotFoundInCache(kid).to_string(),
+                )
+            }
+            AppError::CertificatesRetrieval(s) => {
+                error!("CertificatesRetrieval: {}", s);
+                (
+                    StatusCode::UNAUTHORIZED,
+                    AppError::CertificatesRetrieval(s).to_string(),
+                )
+            }
+            AppError::DecodeJWKS(s) => {
+                error!("DecodeJWKS: {}", s);
+                (
+                    StatusCode::UNAUTHORIZED,
+                    AppError::DecodeJWKS(s).to_string(),
+                )
+            }
+            AppError::RefreshJWKS(s) => {
+                error!("RefreshJWKS: {}", s);
+                (
+                    StatusCode::UNAUTHORIZED,
+                    AppError::RefreshJWKS(s).to_string(),
+                )
+            }
         };
         (status, body).into_response()
     }
