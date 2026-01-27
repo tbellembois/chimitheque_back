@@ -97,7 +97,7 @@ pub async fn create_update_store_location(
     Path(path_params): Path<CreateUpdateStoreLocationPathParameters>,
     Json(store_location): Json<StoreLocation>,
 ) -> Result<Json<u64>, AppError> {
-    info!("create_update_store_location");
+    info!("create_update_store_location: {}", store_location);
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -129,7 +129,7 @@ pub async fn delete_store_location(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
-    info!("delete_store_location");
+    info!("delete_store_location: {}", id);
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();

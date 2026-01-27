@@ -110,7 +110,7 @@ pub async fn create_update_storage(
     Path(path_params): Path<CreateUpdateStoragePathParameters>,
     Json(storage): Json<Storage>,
 ) -> Result<Json<Vec<u64>>, AppError> {
-    info!("create_update_storage");
+    info!("create_update_storage: {}", storage);
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -149,7 +149,7 @@ pub async fn delete_storage(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
-    info!("delete_storage");
+    info!("delete_storage: {}", id);
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -194,7 +194,7 @@ pub async fn archive_storage(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
-    info!("archive_storage");
+    info!("archive_storage: {}", id);
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -210,7 +210,7 @@ pub async fn unarchive_storage(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
-    info!("unarchive_storage");
+    info!("unarchive_storage: {}", id);
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();

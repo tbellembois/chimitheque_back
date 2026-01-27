@@ -98,7 +98,7 @@ pub async fn create_update_entity(
     Path(path_params): Path<CreateUpdateEntityPathParameters>,
     Json(entity): Json<Entity>,
 ) -> Result<Json<u64>, AppError> {
-    info!("create_update_entity");
+    info!("create_update_entity: {}", entity);
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -130,7 +130,7 @@ pub async fn delete_entity(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
-    info!("delete_entity");
+    info!("delete_entity: {}", id);
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();

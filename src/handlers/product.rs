@@ -98,7 +98,7 @@ pub async fn create_update_product(
     Path(path_params): Path<CreateUpdateProductPathParameters>,
     Json(product): Json<Product>,
 ) -> Result<Json<u64>, AppError> {
-    info!("create_update_product");
+    info!("create_update_product: {}", product);
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -128,7 +128,7 @@ pub async fn delete_product(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
-    info!("delete_product");
+    info!("delete_product: {}", id);
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();

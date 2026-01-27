@@ -127,7 +127,7 @@ pub async fn create_update_person(
     Path(path_params): Path<CreateUpdatePersonPathParameters>,
     Json(person): Json<Person>,
 ) -> Result<Json<u64>, AppError> {
-    info!("create_update_person");
+    info!("create_update_person: {}", person);
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -159,7 +159,7 @@ pub async fn delete_person(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
-    info!("delete_person");
+    info!("delete_person: {}", id);
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
