@@ -64,19 +64,16 @@ use chimitheque_db::{
     person::{get_admins, set_person_admin, unset_person_admin},
 };
 use chimitheque_types::{person::Person, requestfilter::RequestFilter};
-use chrono::Local;
 use dashmap::DashMap;
 use governor::{Quota, RateLimiter};
 use http::Method;
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
-use log::{debug, info};
 use once_cell::sync::OnceCell;
 use r2d2::{self};
 use r2d2_sqlite::SqliteConnectionManager;
 use regex::Regex;
 use rusqlite::Connection;
 use serde::Deserialize;
-use std::io::Write;
 use std::{
     env,
     num::NonZeroU32,
@@ -85,11 +82,17 @@ use std::{
 };
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
 use tower_sessions::{
     Expiry, MemoryStore, SessionManagerLayer,
     cookie::{SameSite, time::Duration},
 };
+use tracing::{Span, info_span};
+use tracing::{debug, info};
+use tracing_subscriber::EnvFilter;
 use ureq::config::Config;
 use url::Url;
 
@@ -298,14 +301,18 @@ async fn authenticate_middleware(
         }
     };
 
-    request.headers_mut().insert(
-        "chimitheque_person_id",
-        person.person_id.unwrap().to_string().parse().unwrap(),
-    );
-    request.headers_mut().insert(
-        "chimitheque_person_email",
-        person.person_email.parse().unwrap(),
-    );
+    let chimitheque_person_id = person.person_id.unwrap().to_string().parse().unwrap();
+    let chimitheque_person_email = person.person_email.parse().unwrap();
+
+    Span::current().record("user_id", format!("{}", person.person_id.unwrap()));
+    Span::current().record("user_email", person.person_email.clone());
+
+    request
+        .headers_mut()
+        .insert("chimitheque_person_id", chimitheque_person_id);
+    request
+        .headers_mut()
+        .insert("chimitheque_person_email", chimitheque_person_email);
 
     next.run(request).await
 }
@@ -457,18 +464,15 @@ pub async fn run(
     keycloak_realm: String,
     keycloak_client_id: String,
 ) {
-    // Initialize logger.
-    env_logger::builder()
-        .format_timestamp_millis()
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "{} [{}] - {}",
-                Local::now().format("%Y-%m-%dT%H:%M:%S"),
-                record.level(),
-                record.args()
-            )
-        })
+    // Initialize tracing + log bridging
+    tracing_subscriber::fmt()
+        // This allows to use, e.g., `RUST_LOG=info` or `RUST_LOG=debug`, RUST_LOG=chimitheque_back=debug,tower_http=warn
+        // when running the app to set log levels.
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .or_else(|_| EnvFilter::try_new("chimitheque_back=info,tower_http=warn"))
+                .unwrap(),
+        )
         .init();
 
     // Create DB pool.
@@ -825,6 +829,18 @@ pub async fn run(
         // .layer(middleware::from_fn_with_state(state.clone(), my_middleware))
         .layer(session_layer)
         .layer(cors)
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|req: &axum::http::Request<_>| {
+                info_span!(
+                    "http_request",
+                    method = %req.method(),
+                    uri = %req.uri(),
+                    user_id = tracing::field::Empty,
+                    user_email = tracing::field::Empty,
+                    request_id = tracing::field::Empty,
+                )
+            }),
+        )
         .with_state(state);
     // with_state(state) moves the state into the router, and Axum clones it per request.
     // If your state is a normal struct, each handler gets its own copy, so possible mutations are not global.

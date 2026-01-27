@@ -2,8 +2,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use log::error;
 use thiserror::Error;
+use tracing::error;
 
 #[derive(Error, Debug)]
 pub enum AppError {
@@ -116,7 +116,7 @@ impl IntoResponse for AppError {
                 )
             }
             AppError::PermissionDenied => {
-                error!("PermissionDenied");
+                // We do not log permission denied errors.
                 (
                     StatusCode::FORBIDDEN,
                     AppError::PermissionDenied.to_string(),

@@ -6,6 +6,7 @@ use axum::{
 use chimitheque_types::{person::Person, requestfilter::RequestFilter};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
+use tracing::info;
 
 use crate::{
     AppState, appstate::init_casbin_enforcer, errors::AppError,
@@ -46,6 +47,8 @@ pub async fn get_people(
     headers: HeaderMap,
     request_filter: RequestFilter,
 ) -> Result<Json<(Vec<Person>, usize)>, AppError> {
+    info!("get_people");
+
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
@@ -79,6 +82,8 @@ pub async fn get_people_old(
     headers: HeaderMap,
     request_filter: RequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    info!("get_people_old");
+
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
@@ -122,6 +127,8 @@ pub async fn create_update_person(
     Path(path_params): Path<CreateUpdatePersonPathParameters>,
     Json(person): Json<Person>,
 ) -> Result<Json<u64>, AppError> {
+    info!("create_update_person");
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
@@ -152,6 +159,8 @@ pub async fn delete_person(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
+    info!("delete_person");
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();

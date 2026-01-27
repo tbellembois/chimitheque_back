@@ -6,6 +6,7 @@ use axum::{
 use chimitheque_types::{requestfilter::RequestFilter, storelocation::StoreLocation};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
+use tracing::info;
 
 use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
 
@@ -14,6 +15,8 @@ pub async fn get_store_locations(
     headers: HeaderMap,
     request_filter: RequestFilter,
 ) -> Result<Json<(Vec<StoreLocation>, usize)>, AppError> {
+    info!("get_store_locations");
+
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
@@ -47,6 +50,8 @@ pub async fn get_store_locations_old(
     headers: HeaderMap,
     request_filter: RequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    info!("get_store_locations_old");
+
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
@@ -92,6 +97,8 @@ pub async fn create_update_store_location(
     Path(path_params): Path<CreateUpdateStoreLocationPathParameters>,
     Json(store_location): Json<StoreLocation>,
 ) -> Result<Json<u64>, AppError> {
+    info!("create_update_store_location");
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
@@ -122,6 +129,8 @@ pub async fn delete_store_location(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
+    info!("delete_store_location");
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();

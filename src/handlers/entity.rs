@@ -6,6 +6,7 @@ use axum::{
 use chimitheque_types::{entity::Entity, requestfilter::RequestFilter, stock::Stock};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
+use tracing::info;
 
 use crate::{
     AppState, appstate::init_casbin_enforcer, errors::AppError,
@@ -17,6 +18,8 @@ pub async fn get_entities(
     headers: HeaderMap,
     request_filter: RequestFilter,
 ) -> Result<Json<(Vec<Entity>, usize)>, AppError> {
+    info!("get_entities");
+
     // Get the chimitheque_entity_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
@@ -50,6 +53,8 @@ pub async fn get_entities_old(
     headers: HeaderMap,
     request_filter: RequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    info!("get_entities_old");
+
     // Get the chimitheque_entity_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
@@ -93,6 +98,8 @@ pub async fn create_update_entity(
     Path(path_params): Path<CreateUpdateEntityPathParameters>,
     Json(entity): Json<Entity>,
 ) -> Result<Json<u64>, AppError> {
+    info!("create_update_entity");
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
@@ -123,6 +130,8 @@ pub async fn delete_entity(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
+    info!("delete_entity");
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
@@ -140,6 +149,8 @@ pub async fn get_entity_stock(
     headers: HeaderMap,
     Path(id): Path<u64>,
 ) -> Result<Json<Vec<Stock>>, AppError> {
+    info!("get_entity_stock");
+
     // Get the chimitheque_entity_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,

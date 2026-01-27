@@ -7,6 +7,7 @@ use axum_extra::extract::Query;
 use chimitheque_types::{requestfilter::RequestFilter, storage::Storage};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
+use tracing::info;
 
 use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
 
@@ -15,6 +16,8 @@ pub async fn get_storages(
     headers: HeaderMap,
     request_filter: RequestFilter,
 ) -> Result<Json<(Vec<Storage>, usize)>, AppError> {
+    info!("get_storages");
+
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
@@ -48,6 +51,8 @@ pub async fn get_storages_old(
     headers: HeaderMap,
     request_filter: RequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    info!("get_storages_old");
+
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
@@ -105,6 +110,8 @@ pub async fn create_update_storage(
     Path(path_params): Path<CreateUpdateStoragePathParameters>,
     Json(storage): Json<Storage>,
 ) -> Result<Json<Vec<u64>>, AppError> {
+    info!("create_update_storage");
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
@@ -142,6 +149,8 @@ pub async fn delete_storage(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
+    info!("delete_storage");
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
@@ -157,6 +166,8 @@ pub async fn export_storages(
     headers: HeaderMap,
     request_filter: RequestFilter,
 ) -> Result<String, AppError> {
+    info!("export_storages");
+
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
@@ -183,6 +194,8 @@ pub async fn archive_storage(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
+    info!("archive_storage");
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
@@ -197,6 +210,8 @@ pub async fn unarchive_storage(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
+    info!("unarchive_storage");
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();

@@ -14,7 +14,7 @@ use governor::{
     middleware::NoOpMiddleware,
     state::{InMemoryState, NotKeyed},
 };
-use log::error;
+use tracing::error;
 use r2d2::{self, Pool};
 use r2d2_sqlite::SqliteConnectionManager;
 use std::{ops::Deref, sync::Arc};

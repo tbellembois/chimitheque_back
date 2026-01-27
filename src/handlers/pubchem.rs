@@ -9,6 +9,7 @@ use chimitheque_types::pubchemproduct::PubchemProduct;
 use http::HeaderMap;
 use serde::Deserialize;
 use std::ops::{Deref, DerefMut};
+use tracing::info;
 
 use crate::{appstate::AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
 
@@ -60,6 +61,8 @@ pub async fn pubchem_create_update_product(
     Path(path_params): Path<CreateUpdateProductPathParameters>,
     Json(pubchem_product): Json<PubchemProduct>,
 ) -> Result<Json<u64>, AppError> {
+    info!("pubchem_create_update_product");
+
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
