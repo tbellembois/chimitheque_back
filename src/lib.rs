@@ -93,6 +93,8 @@ use tower_sessions::{
 use tracing::{Span, info_span};
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use ureq::config::Config;
 use url::Url;
 
@@ -465,15 +467,26 @@ pub async fn run(
     keycloak_client_id: String,
 ) {
     // Initialize tracing + log bridging
-    tracing_subscriber::fmt()
-        // This allows to use, e.g., `RUST_LOG=info` or `RUST_LOG=debug`, RUST_LOG=chimitheque_back=debug,tower_http=warn
-        // when running the app to set log levels.
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .or_else(|_| EnvFilter::try_new("chimitheque_back=info,tower_http=warn"))
-                .unwrap(),
-        )
+    let fmt_layer = tracing_subscriber::fmt::layer().json();
+    let filter = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new("chimitheque_back=info,tower_http=warn"))
+        .unwrap();
+
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt_layer)
         .init();
+
+    // tracing_subscriber::fmt()
+    //     .json()
+    //     // This allows to use, e.g., `RUST_LOG=info` or `RUST_LOG=debug`, RUST_LOG=chimitheque_back=debug,tower_http=warn
+    //     // when running the app to set log levels.
+    //     .with_env_filter(
+    //         EnvFilter::try_from_default_env()
+    //             .or_else(|_| EnvFilter::try_new("chimitheque_back=info,tower_http=warn"))
+    //             .unwrap(),
+    //     )
+    //     .init();
 
     // Create DB pool.
     info!("creating DB pool");

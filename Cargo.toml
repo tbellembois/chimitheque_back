@@ -31,7 +31,7 @@ tower = "0.5"
 tower-http = { version = "0.6", features = ["cors","trace"] }
 tower-sessions = "0.14"
 tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.22", features=["env-filter"] }
+tracing-subscriber = { version = "0.3.22", features=["env-filter", "json"] }
 ureq = { version = "3", features = ["json"] }
 url = "2.5.7"
 urlencoding = "2.1.3"
