@@ -61,14 +61,14 @@ impl IntoResponse for AppError {
             AppError::ClaimsDecoding(s) => {
                 error!("ClaimsDecoding: {}", s);
                 (
-                    StatusCode::INTERNAL_SERVER_ERROR,
+                    StatusCode::BAD_REQUEST,
                     AppError::ClaimsDecoding(s).to_string(),
                 )
             }
             AppError::MissingEmailInClaims => {
                 error!("MissingEmailInClaims");
                 (
-                    StatusCode::INTERNAL_SERVER_ERROR,
+                    StatusCode::BAD_REQUEST,
                     AppError::MissingEmailInClaims.to_string(),
                 )
             }
@@ -111,7 +111,7 @@ impl IntoResponse for AppError {
             AppError::ChimithequePersonIdHeaderInvalid(header_value) => {
                 error!("ChimithequePersonIdHeaderInvalid: {}", header_value);
                 (
-                    StatusCode::INTERNAL_SERVER_ERROR,
+                    StatusCode::BAD_REQUEST,
                     AppError::ChimithequePersonIdHeaderInvalid(header_value).to_string(),
                 )
             }

@@ -1,9 +1,9 @@
 use http::HeaderMap;
 
-use crate::errors::AppError;
+use crate::{constants::CHIMITHEQUE_PERSON_ID_HEADER, errors::AppError};
 
 pub(crate) fn get_chimitheque_person_id_from_headers(headers: &HeaderMap) -> Result<u64, AppError> {
-    let Some(chimitheque_person_id_header) = headers.get("chimitheque_person_id") else {
+    let Some(chimitheque_person_id_header) = headers.get(CHIMITHEQUE_PERSON_ID_HEADER) else {
         return Err(AppError::ChimithequePersonIdHeaderMissing);
     };
 

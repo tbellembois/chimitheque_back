@@ -1,10 +1,12 @@
 pub mod appstate;
+pub mod constants;
 pub mod errors;
 pub mod handlers;
 pub mod utils;
 
 use crate::{
     appstate::{AppState, init_casbin_enforcer},
+    constants::{CHIMITHEQUE_PERSON_EMAIL_HEADER, CHIMITHEQUE_PERSON_ID_HEADER, REQUEST_ID_HEADER},
     errors::AppError,
     handlers::{
         bookmark::toogle_bookmark,
@@ -66,9 +68,11 @@ use chimitheque_db::{
 use chimitheque_types::{person::Person, requestfilter::RequestFilter};
 use dashmap::DashMap;
 use governor::{Quota, RateLimiter};
-use http::Method;
+use http::{HeaderValue, Method};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use once_cell::sync::OnceCell;
+use opentelemetry::KeyValue;
+use opentelemetry_sdk::{Resource, trace as sdktrace};
 use r2d2::{self};
 use r2d2_sqlite::SqliteConnectionManager;
 use regex::Regex;
@@ -92,11 +96,12 @@ use tower_sessions::{
 };
 use tracing::{Span, info_span};
 use tracing::{debug, info};
-use tracing_subscriber::EnvFilter;
+use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use ureq::config::Config;
 use url::Url;
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct AuthContext {
@@ -303,20 +308,50 @@ async fn authenticate_middleware(
         }
     };
 
-    let chimitheque_person_id = person.person_id.unwrap().to_string().parse().unwrap();
-    let chimitheque_person_email = person.person_email.parse().unwrap();
+    // Get request UUID for OpenTelemetry - reuse incoming request ID if present
+    let request_id = request
+        .headers()
+        .get(REQUEST_ID_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
 
+    // Record into current tracing span
+    Span::current().record(REQUEST_ID_HEADER, request_id.as_str());
     Span::current().record("user_id", format!("{}", person.person_id.unwrap()));
     Span::current().record("user_email", person.person_email.clone());
 
-    request
-        .headers_mut()
-        .insert("chimitheque_person_id", chimitheque_person_id);
-    request
-        .headers_mut()
-        .insert("chimitheque_person_email", chimitheque_person_email);
+    // Set request headers.
+    request.headers_mut().insert(
+        REQUEST_ID_HEADER,
+        HeaderValue::from_str(&request_id).unwrap(),
+    );
+    request.headers_mut().insert(
+        CHIMITHEQUE_PERSON_ID_HEADER,
+        HeaderValue::from_str(&person.person_id.unwrap().to_string()).unwrap(),
+    );
+    request.headers_mut().insert(
+        CHIMITHEQUE_PERSON_EMAIL_HEADER,
+        HeaderValue::from_str(&person.person_email).unwrap(),
+    );
 
-    next.run(request).await
+    let mut response = next.run(request).await;
+
+    // Echo back headers to the client.
+    response.headers_mut().insert(
+        REQUEST_ID_HEADER,
+        HeaderValue::from_str(&request_id).unwrap(),
+    );
+    response.headers_mut().insert(
+        CHIMITHEQUE_PERSON_ID_HEADER,
+        HeaderValue::from_str(&person.person_id.unwrap().to_string()).unwrap(),
+    );
+    response.headers_mut().insert(
+        CHIMITHEQUE_PERSON_EMAIL_HEADER,
+        HeaderValue::from_str(&person.person_email).unwrap(),
+    );
+
+    response
 }
 
 // Authorize the connected user to perform the request action.
@@ -407,9 +442,26 @@ async fn authorize_middleware(
     ]
     .contains(&item)
     {
+        let request_id = headers
+            .get(REQUEST_ID_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("unknown");
+
+        let decision_span = tracing::debug_span!(
+            "casbin.enforce",
+            request_id = %request_id,
+            subject = %chimitheque_person_id,
+            action = %request_action,
+            object = %item,
+            object_id = %item_id,
+            decision = tracing::field::Empty,
+        );
+
         // Get the casbin enforcer from the state object.
         // TODO: https://github.com/tokio-rs/axum/discussions/2458
         let casbin_enforcer = state.casbin_enforcer.lock().await;
+
+        let _enter = decision_span.enter();
 
         match casbin_enforcer.enforce((
             chimitheque_person_id.to_string(),
@@ -418,14 +470,21 @@ async fn authorize_middleware(
             item_id,
         )) {
             Ok(true) => {
-                debug!("authorize_middleware: true");
+                decision_span.record("decision", "allow");
+                debug!("casbin allow");
             }
             Ok(false) => {
-                debug!("authorize_middleware: false");
+                decision_span.record("decision", "deny");
+                debug!("casbin deny");
 
                 return AppError::PermissionDenied.into_response();
             }
-            Err(err) => return AppError::CasbinError(err.to_string()).into_response(),
+            Err(err) => {
+                decision_span.record("decision", "error");
+                debug!(error = %err, "casbin error");
+
+                return AppError::CasbinError(err.to_string()).into_response();
+            }
         };
     }
 
@@ -459,6 +518,31 @@ async fn _debug_middleware(
     response
 }
 
+fn init_tracing_with_opentelemetry() {
+    let exporter = opentelemetry_otlp::new_exporter().tonic();
+
+    let tracer = opentelemetry_otlp::new_pipeline()
+        .tracing()
+        .with_exporter(exporter)
+        .with_trace_config(sdktrace::config().with_resource(Resource::new(vec![
+            KeyValue::new("service.name", "chimitheque-back"),
+            KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
+        ])))
+        .install_batch(opentelemetry_sdk::runtime::Tokio)
+        .expect("failed to init OpenTelemetry tracer");
+
+    let otel_layer = OpenTelemetryLayer::new(tracer);
+
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| "chimitheque_back=info,tower_http=warn".into());
+
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(tracing_subscriber::fmt::layer().json())
+        .with(otel_layer)
+        .init();
+}
+
 pub async fn run(
     db_path: String,
     admins: String,
@@ -467,26 +551,18 @@ pub async fn run(
     keycloak_client_id: String,
 ) {
     // Initialize tracing + log bridging
-    let fmt_layer = tracing_subscriber::fmt::layer().json();
-    let filter = EnvFilter::try_from_default_env()
-        .or_else(|_| EnvFilter::try_new("chimitheque_back=info,tower_http=warn"))
-        .unwrap();
+    // let fmt_layer = tracing_subscriber::fmt::layer().json();
+    // let filter = EnvFilter::try_from_default_env()
+    //     .or_else(|_| EnvFilter::try_new("chimitheque_back=info,tower_http=warn"))
+    //     .unwrap();
 
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(fmt_layer)
-        .init();
-
-    // tracing_subscriber::fmt()
-    //     .json()
-    //     // This allows to use, e.g., `RUST_LOG=info` or `RUST_LOG=debug`, RUST_LOG=chimitheque_back=debug,tower_http=warn
-    //     // when running the app to set log levels.
-    //     .with_env_filter(
-    //         EnvFilter::try_from_default_env()
-    //             .or_else(|_| EnvFilter::try_new("chimitheque_back=info,tower_http=warn"))
-    //             .unwrap(),
-    //     )
+    // tracing_subscriber::registry()
+    //     .with(filter)
+    //     .with(fmt_layer)
     //     .init();
+
+    // Initialize tracing with OpenTelemetry.
+    init_tracing_with_opentelemetry();
 
     // Create DB pool.
     info!("creating DB pool");
@@ -501,7 +577,7 @@ pub async fn run(
             unsafe { conn.load_extension_enable() }?;
 
             // Load the extension (example path)
-            unsafe { conn.load_extension(format!("{}/{}", sql_extension_dir, "regexp.so"), None) }?;
+            unsafe { conn.load_extension(format!("{}/{}", sql_extension_dir, "regex0.so"), None) }?;
 
             // Disable again for safety
             conn.load_extension_disable()?;
@@ -864,4 +940,6 @@ pub async fn run(
     axum::serve(listener, app.into_make_service())
         .await
         .unwrap();
+
+    opentelemetry::global::shutdown_tracer_provider();
 }

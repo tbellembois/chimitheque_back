@@ -17,17 +17,21 @@ pub async fn get_connected_user(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Result<Json<Person>, AppError> {
+    info!("get_connected_user");
+
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
         Ok(chimitheque_person_id) => chimitheque_person_id,
         Err(err) => return Err(err),
     };
 
+    info!("chimitheque_person_id: {}", chimitheque_person_id);
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    let maybe_person = chimitheque_db::person::get_people(
+    let maybe_people = chimitheque_db::person::get_people(
         db_connection.deref(),
         RequestFilter {
             id: Some(chimitheque_person_id),
@@ -36,8 +40,8 @@ pub async fn get_connected_user(
         chimitheque_person_id,
     );
 
-    match maybe_person {
-        Ok((person, _)) => Ok(Json(person.first().unwrap().to_owned())),
+    match maybe_people {
+        Ok((people, _)) => Ok(Json(people.first().unwrap().to_owned())),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }
