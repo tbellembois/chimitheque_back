@@ -46,7 +46,8 @@ use crate::{
             get_store_locations_old,
         },
         validate::{
-            validate_cas_number, validate_ce_number, validate_email, validate_empirical_formula,
+            linear_to_empirical_formula, validate_cas_number_old, validate_ce_number_old,
+            validate_empirical_formula_old,
         },
     },
     utils::get_chimitheque_person_id_from_headers,
@@ -894,12 +895,22 @@ pub async fn run(
         //
         .route("/borrows/{id}", get(toogle_borrowing))
         //
-        .route("/validate/email/{email}", get(validate_email))
-        .route("/validate/casnumber/{cas_number}", get(validate_cas_number))
-        .route("/validate/cenumber/{ce_number}", get(validate_ce_number))
+        //TODO
+        // .route("/validate/casnumber/{cas_number}", get(validate_cas_number))
+        // .route("/validate/cenumber/{ce_number}", get(validate_ce_number))
+        // .route(
+        //     "/validate/empiricalformula/{empirical_formula}",
+        //     get(validate_empirical_formula),
+        // )
+        .route("/validate/casnumber_old", get(validate_cas_number_old))
+        .route("/validate/cenumber_old", get(validate_ce_number_old))
         .route(
-            "/validate/empiricalformula/{empirical_formula}",
-            get(validate_empirical_formula),
+            "/validate/empiricalformula_old",
+            get(validate_empirical_formula_old),
+        )
+        .route(
+            "/validate/lineartoempiricalformula/{linear_formula}",
+            get(linear_to_empirical_formula),
         )
         //
         .layer(middleware::from_fn_with_state(
