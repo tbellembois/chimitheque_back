@@ -14,11 +14,11 @@ use governor::{
     middleware::NoOpMiddleware,
     state::{InMemoryState, NotKeyed},
 };
-use tracing::error;
 use r2d2::{self, Pool};
 use r2d2_sqlite::SqliteConnectionManager;
 use std::{ops::Deref, sync::Arc};
 use tokio::sync::Mutex;
+use tracing::error;
 
 use crate::errors::AppError;
 
@@ -231,7 +231,7 @@ pub async fn init_casbin_enforcer(
     );
 
     casbin_enforcer.add_function(
-        "matchStorelocationHasChildren",
+        "matchStoreLocationHasChildren",
         OperatorFunction::Arg1Closure(Arc::new(move |store_location_id: Dynamic| {
             let store_location_id: u64 = match store_location_id.clone().into_string() {
                 Ok(store_location_id) => match store_location_id.parse::<u64>() {
@@ -275,7 +275,7 @@ pub async fn init_casbin_enforcer(
     );
 
     casbin_enforcer.add_function(
-        "matchStorelocationHasStorages",
+        "matchStoreLocationHasStorages",
         OperatorFunction::Arg1Closure(Arc::new(move |store_location_id: Dynamic| {
             let store_location_id: u64 = match store_location_id.clone().into_string() {
                 Ok(store_location_id) => match store_location_id.parse::<u64>() {
