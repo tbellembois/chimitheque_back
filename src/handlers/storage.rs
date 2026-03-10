@@ -6,7 +6,6 @@ use axum::{
 use axum_extra::extract::Query;
 use chimitheque_types::{requestfilter::RequestFilter, storage::Storage};
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 use tracing::info;
 
 use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
@@ -29,7 +28,7 @@ pub async fn get_storages(
     let db_connection = db_connection_pool.get().unwrap();
 
     let mayerr_storages = chimitheque_db::storage::get_storages(
-        db_connection.deref(),
+        &db_connection,
         request_filter,
         chimitheque_person_id,
     );
@@ -64,7 +63,7 @@ pub async fn get_storages_old(
     let db_connection = db_connection_pool.get().unwrap();
 
     let mayerr_storages = chimitheque_db::storage::get_storages(
-        db_connection.deref(),
+        &db_connection,
         request_filter.clone(),
         chimitheque_person_id,
     );
@@ -120,7 +119,7 @@ pub async fn create_update_storage(
     let mut storage = storage.clone();
     if let Err(err) = storage.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
-    };
+    }
 
     // update?
     if path_params.id > 0 {
@@ -133,7 +132,7 @@ pub async fn create_update_storage(
     }
 
     let mayerr_storage_id = chimitheque_db::storage::create_update_storage(
-        db_connection.deref_mut(),
+        &mut db_connection,
         storage,
         query_params.nb_items,
         query_params.identical_barecode,
@@ -155,8 +154,8 @@ pub async fn delete_storage(
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::storage::delete_storage(db_connection.deref_mut(), id) {
-        Ok(_) => Ok(()),
+    match chimitheque_db::storage::delete_storage(&mut db_connection, id) {
+        Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }
@@ -179,7 +178,7 @@ pub async fn export_storages(
     let db_connection = db_connection_pool.get().unwrap();
 
     let mayerr_storages = chimitheque_db::storage::export_storages(
-        db_connection.deref(),
+        &db_connection,
         request_filter,
         chimitheque_person_id,
     );
@@ -200,8 +199,8 @@ pub async fn archive_storage(
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::storage::archive_storage(db_connection.deref_mut(), id) {
-        Ok(_) => Ok(()),
+    match chimitheque_db::storage::archive_storage(&mut db_connection, id) {
+        Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }
@@ -216,8 +215,8 @@ pub async fn unarchive_storage(
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::storage::unarchive_storage(db_connection.deref_mut(), id) {
-        Ok(_) => Ok(()),
+    match chimitheque_db::storage::unarchive_storage(&mut db_connection, id) {
+        Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }

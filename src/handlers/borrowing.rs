@@ -3,7 +3,6 @@ use axum_extra::extract::Query;
 use chimitheque_db::borrowing::toggle_storage_borrowing;
 use http::HeaderMap;
 use serde::Deserialize;
-use std::ops::DerefMut;
 
 use crate::{appstate::AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
 
@@ -38,13 +37,13 @@ pub async fn toogle_borrowing(
     let mut db_connection = db_connection_pool.get().unwrap();
 
     match toggle_storage_borrowing(
-        db_connection.deref_mut(),
+        &mut db_connection,
         chimitheque_person_id,
         path_params.id,
         query_params.borrower_id,
         Some(query_params.borrowing_comment),
     ) {
-        Ok(_) => Ok(()),
+        Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }

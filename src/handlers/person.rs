@@ -5,7 +5,6 @@ use axum::{
 };
 use chimitheque_types::{person::Person, requestfilter::RequestFilter};
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 use tracing::info;
 
 use crate::{
@@ -32,8 +31,8 @@ pub async fn get_connected_user(
     let db_connection = db_connection_pool.get().unwrap();
 
     let maybe_people = chimitheque_db::person::get_people(
-        db_connection.deref(),
-        RequestFilter {
+        &db_connection,
+        &RequestFilter {
             id: Some(chimitheque_person_id),
             ..Default::default()
         },
@@ -64,8 +63,8 @@ pub async fn get_people(
     let db_connection = db_connection_pool.get().unwrap();
 
     let mayerr_people = chimitheque_db::person::get_people(
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
         chimitheque_person_id,
     );
 
@@ -99,8 +98,8 @@ pub async fn get_people_old(
     let db_connection = db_connection_pool.get().unwrap();
 
     let mayerr_people = chimitheque_db::person::get_people(
-        db_connection.deref(),
-        request_filter.clone(),
+        &db_connection,
+        &request_filter.clone(),
         chimitheque_person_id,
     );
 
@@ -141,7 +140,7 @@ pub async fn create_update_person(
     let mut person = person.clone();
     if let Err(err) = person.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
-    };
+    }
 
     // update?
     if path_params.id > 0 {
@@ -149,7 +148,7 @@ pub async fn create_update_person(
     }
 
     let mayerr_person_id =
-        chimitheque_db::person::create_update_person(db_connection.deref_mut(), person);
+        chimitheque_db::person::create_update_person(&mut db_connection, person);
 
     init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
 
@@ -171,8 +170,8 @@ pub async fn delete_person(
 
     init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
 
-    match chimitheque_db::person::delete_person(db_connection.deref_mut(), id) {
-        Ok(_) => Ok(()),
+    match chimitheque_db::person::delete_person(&mut db_connection, id) {
+        Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }

@@ -5,7 +5,6 @@ use axum::{
 };
 use chimitheque_types::{requestfilter::RequestFilter, storelocation::StoreLocation};
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 use tracing::info;
 
 use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
@@ -28,7 +27,7 @@ pub async fn get_store_locations(
     let db_connection = db_connection_pool.get().unwrap();
 
     let mayerr_store_locations = chimitheque_db::storelocation::get_store_locations(
-        db_connection.deref(),
+        &db_connection,
         request_filter,
         chimitheque_person_id,
     );
@@ -63,7 +62,7 @@ pub async fn get_store_locations_old(
     let db_connection = db_connection_pool.get().unwrap();
 
     let mayerr_store_locations = chimitheque_db::storelocation::get_store_locations(
-        db_connection.deref(),
+        &db_connection,
         request_filter.clone(),
         chimitheque_person_id,
     );
@@ -107,7 +106,7 @@ pub async fn create_update_store_location(
     let mut store_location = store_location.clone();
     if let Err(err) = store_location.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
-    };
+    }
 
     // update?
     if path_params.id > 0 {
@@ -115,7 +114,7 @@ pub async fn create_update_store_location(
     }
 
     let mayerr_store_location_id = chimitheque_db::storelocation::create_update_store_location(
-        db_connection.deref_mut(),
+        &mut db_connection,
         store_location,
     );
 
@@ -133,10 +132,10 @@ pub async fn delete_store_location(
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
-    let mut db_connection = db_connection_pool.get().unwrap();
+    let db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::storelocation::delete_store_location(db_connection.deref_mut(), id) {
-        Ok(_) => Ok(()),
+    match chimitheque_db::storelocation::delete_store_location(&db_connection, id) {
+        Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }

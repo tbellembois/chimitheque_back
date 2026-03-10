@@ -63,7 +63,7 @@ use axum::{
 };
 use casbin::{CoreApi, DefaultModel, Enforcer, NullAdapter};
 use chimitheque_db::{
-    init::init_db,
+    init::create_tables,
     person::{get_admins, set_person_admin, unset_person_admin},
 };
 use chimitheque_types::{person::Person, requestfilter::RequestFilter};
@@ -79,12 +79,7 @@ use r2d2_sqlite::SqliteConnectionManager;
 use regex::Regex;
 use rusqlite::Connection;
 use serde::Deserialize;
-use std::{
-    env,
-    num::NonZeroU32,
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
+use std::{env, num::NonZeroU32, sync::Arc};
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tower_http::{
@@ -149,12 +144,9 @@ struct JwksCache {
 // Refresh JWKS from Keycloak
 fn refresh_jwks(
     http_client: &Arc<ureq::Agent>,
-    keycloak_base_url: String,
+    keycloak_base_url: &str,
 ) -> Result<JwksCache, AppError> {
-    let url = format!(
-        "{}/realms/chimitheque/protocol/openid-connect/certs",
-        keycloak_base_url
-    );
+    let url = format!("{keycloak_base_url}/realms/chimitheque/protocol/openid-connect/certs");
 
     debug!("url: {}", url);
 
@@ -176,16 +168,13 @@ pub async fn jwt_middleware(
     debug!("jwt_middleware");
 
     // Extract Bearer token.
-    let token = match req
+    let Some(token) = req
         .headers()
         .get("Authorization")
         .and_then(|h| h.to_str().ok())
         .and_then(|h| h.strip_prefix("Bearer "))
-    {
-        Some(token) => token,
-        None => {
-            return AppError::BearerTokenMissing.into_response();
-        }
+    else {
+        return AppError::BearerTokenMissing.into_response();
     };
 
     // Decode header to get kid.
@@ -196,9 +185,8 @@ pub async fn jwt_middleware(
 
     // Extract kid from header.
     // The kid (key ID) Header Parameter is a hint indicating which key was used to secure the JWS.
-    let kid = match header.kid {
-        Some(kid) => kid,
-        None => return AppError::HeaderKIDMissing.into_response(),
+    let Some(kid) = header.kid else {
+        return AppError::HeaderKIDMissing.into_response();
     };
 
     // Get JWKS cache
@@ -215,7 +203,7 @@ pub async fn jwt_middleware(
     // Refresh JWKS if older than 10 minutes or kid not found.
     let kid_found = jwks_lock.keys.iter().any(|k| k.kid == kid);
     if !kid_found || jwks_lock.last_updated.elapsed() > std::time::Duration::from_secs(600) {
-        let keys = match refresh_jwks(&http_client, state.keycloak_base_url.clone()) {
+        let keys = match refresh_jwks(&http_client, &state.keycloak_base_url.clone()) {
             Ok(jwks_cache) => jwks_cache.keys,
             Err(err) => return AppError::RefreshJWKS(err.to_string()).into_response(),
         };
@@ -225,9 +213,8 @@ pub async fn jwt_middleware(
     }
 
     // Find key by kid.
-    let rsa_jwk = match jwks_lock.keys.iter().find(|k| k.kid == kid) {
-        Some(jwk) => jwk,
-        None => return AppError::RSAJWKNotFoundInCache(kid).into_response(),
+    let Some(rsa_jwk) = jwks_lock.keys.iter().find(|k| k.kid == kid) else {
+        return AppError::RSAJWKNotFoundInCache(kid).into_response();
     };
 
     // Decode and validate claims, check expected audience.
@@ -273,12 +260,12 @@ async fn authenticate_middleware(
     // Check that the clails contains the user email.
     if auth.email.is_empty() {
         return AppError::MissingEmailInClaims.into_response();
-    };
+    }
 
     // Get the person from the database.
     let (people, _) = match chimitheque_db::person::get_people(
-        db_connection.deref(),
-        RequestFilter {
+        &db_connection,
+        &RequestFilter {
             person_email: Some(auth.email.clone()),
             ..Default::default()
         },
@@ -289,23 +276,19 @@ async fn authenticate_middleware(
     };
 
     // Creating new person if needed.
-    let person = match people.first() {
-        Some(person) => person,
-        None => {
-            let mut new_person = Person {
-                person_email: auth.email,
-                ..Default::default()
-            };
-            match chimitheque_db::person::create_update_person(
-                db_connection.deref_mut(),
-                new_person.clone(),
-            ) {
-                Ok(person_id) => {
-                    new_person.person_id = Some(person_id);
-                    &new_person.clone()
-                }
-                Err(err) => return AppError::Database(err.to_string()).into_response(),
+    let person = if let Some(person) = people.first() {
+        person
+    } else {
+        let mut new_person = Person {
+            person_email: auth.email,
+            ..Default::default()
+        };
+        match chimitheque_db::person::create_update_person(&mut db_connection, new_person.clone()) {
+            Ok(person_id) => {
+                new_person.person_id = Some(person_id);
+                &new_person.clone()
             }
+            Err(err) => return AppError::Database(err.to_string()).into_response(),
         }
     };
 
@@ -314,8 +297,10 @@ async fn authenticate_middleware(
         .headers()
         .get(REQUEST_ID_HEADER)
         .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| Uuid::new_v4().to_string());
+        .map_or_else(
+            || Uuid::new_v4().to_string(),
+            std::string::ToString::to_string,
+        );
 
     // Record into current tracing span
     Span::current().record(REQUEST_ID_HEADER, request_id.as_str());
@@ -414,7 +399,7 @@ async fn authorize_middleware(
     let maybe_first_segment = mayerr_parsed_uri
         .unwrap()
         .path_segments()
-        .and_then(|mut segments| segments.next().map(|segment| segment.to_string()));
+        .and_then(|mut segments| segments.next().map(std::string::ToString::to_string));
 
     // Then the casbin item.
     let Some(item) = maybe_first_segment else {
@@ -486,7 +471,7 @@ async fn authorize_middleware(
 
                 return AppError::CasbinError(err.to_string()).into_response();
             }
-        };
+        }
     }
 
     next.run(request).await
@@ -590,7 +575,7 @@ pub async fn run(
     let mut db_connection = db_connection_pool.get().unwrap();
 
     // Initialize database;
-    init_db(db_connection.deref_mut()).unwrap();
+    create_tables(&mut db_connection).unwrap();
 
     // Capture command line admins - add admin@chimitheque.fr.
     let re = Regex::new(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b").unwrap();
@@ -601,7 +586,7 @@ pub async fn run(
     info!("command line admins: {:#?}", command_line_admins);
 
     // Getting current admins emails.
-    let current_admins: Vec<String> = get_admins(db_connection.deref_mut())
+    let current_admins: Vec<String> = get_admins(&db_connection)
         .unwrap()
         .iter()
         .map(|p| p.person_email.clone())
@@ -610,13 +595,15 @@ pub async fn run(
     info!("current admins: {:#?}", current_admins);
 
     // Adding new admins.
-    for command_line_admin in command_line_admins.iter() {
+    for command_line_admin in &command_line_admins {
         debug!("command line admin: {}", command_line_admin);
 
-        if !current_admins.contains(&command_line_admin.to_string()) {
+        if current_admins.contains(&command_line_admin.to_string()) {
+            info!("{} is already an admin", command_line_admin);
+        } else {
             let person_id = chimitheque_db::person::get_people(
-                db_connection.deref_mut(),
-                RequestFilter {
+                &db_connection,
+                &RequestFilter {
                     person_email: Some(command_line_admin.to_string()),
                     ..Default::default()
                 },
@@ -630,21 +617,19 @@ pub async fn run(
             .unwrap();
 
             info!("adding new admin: {}", command_line_admin);
-            set_person_admin(db_connection.deref_mut(), person_id).unwrap();
-        } else {
-            info!("{} is already an admin", command_line_admin);
+            set_person_admin(&mut db_connection, person_id).unwrap();
         }
     }
 
     // Removing former admins.
-    for current_admin in current_admins.iter() {
+    for current_admin in &current_admins {
         debug!("current_admin admin: {}", current_admin);
 
         if !command_line_admins.contains(&current_admin.as_str()) {
             let person_id = chimitheque_db::person::get_people(
-                db_connection.deref_mut(),
-                RequestFilter {
-                    person_email: Some(current_admin.to_string()),
+                &db_connection,
+                &RequestFilter {
+                    person_email: Some(current_admin.clone()),
                     ..Default::default()
                 },
                 1,
@@ -657,7 +642,7 @@ pub async fn run(
             .unwrap();
 
             info!("removing admin: {}", current_admin);
-            unset_person_admin(db_connection.deref_mut(), person_id).unwrap();
+            unset_person_admin(&mut db_connection, person_id).unwrap();
         }
     }
 

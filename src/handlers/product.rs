@@ -5,7 +5,6 @@ use axum::{
 };
 use chimitheque_types::{product::Product, requestfilter::RequestFilter};
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 use tracing::info;
 
 use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
@@ -28,7 +27,7 @@ pub async fn get_products(
     let db_connection = db_connection_pool.get().unwrap();
 
     let mayerr_products = chimitheque_db::product::get_products(
-        db_connection.deref(),
+        &db_connection,
         request_filter.clone(),
         chimitheque_person_id,
     );
@@ -73,7 +72,7 @@ pub async fn get_products_old(
     let db_connection = db_connection_pool.get().unwrap();
 
     let mayerr_products = chimitheque_db::product::get_products(
-        db_connection.deref(),
+        &db_connection,
         request_filter,
         chimitheque_person_id,
     );
@@ -108,7 +107,7 @@ pub async fn create_update_product(
     let mut product = product.clone();
     if let Err(err) = product.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
-    };
+    }
 
     // update?
     if path_params.id > 0 {
@@ -116,7 +115,7 @@ pub async fn create_update_product(
     }
 
     let mayerr_product_id =
-        chimitheque_db::product::create_update_product(db_connection.deref_mut(), product);
+        chimitheque_db::product::create_update_product(&mut db_connection, product);
 
     match mayerr_product_id {
         Ok(product_id) => Ok(Json(product_id)),
@@ -134,8 +133,8 @@ pub async fn delete_product(
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::product::delete_product(db_connection.deref_mut(), id) {
-        Ok(_) => Ok(()),
+    match chimitheque_db::product::delete_product(&mut db_connection, id) {
+        Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }
@@ -158,7 +157,7 @@ pub async fn export_products(
     let db_connection = db_connection_pool.get().unwrap();
 
     let mayerr_products = chimitheque_db::product::export_products(
-        db_connection.deref(),
+        &db_connection,
         request_filter,
         chimitheque_person_id,
     );

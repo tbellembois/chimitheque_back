@@ -10,7 +10,6 @@ use chimitheque_types::{
 };
 use chimitheque_utils::string::Transform;
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 
 use crate::{appstate::AppState, errors::AppError};
 
@@ -26,8 +25,8 @@ pub async fn get_cas_numbers(
         &CasNumber {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((cas_numbers, count)) => Ok(Json((cas_numbers, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -55,8 +54,8 @@ pub async fn get_cas_numbers_old(
         &CasNumber {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((cas_numbers, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: cas_numbers,
@@ -78,8 +77,8 @@ pub async fn get_ce_numbers(
         &CeNumber {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((ce_numbers, count)) => Ok(Json((ce_numbers, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -98,8 +97,8 @@ pub async fn get_ce_numbers_old(
         &CeNumber {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((ce_numbers, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: ce_numbers,
@@ -121,8 +120,8 @@ pub async fn get_categories(
         &Category {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((categories, count)) => Ok(Json((categories, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -141,8 +140,8 @@ pub async fn get_categories_old(
         &Category {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((categories, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: categories,
@@ -164,8 +163,8 @@ pub async fn get_classes_of_compounds(
         &ClassOfCompound {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((classes_of_compounds, count)) => Ok(Json((classes_of_compounds, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -184,8 +183,8 @@ pub async fn get_classes_of_compounds_old(
         &ClassOfCompound {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((classes_of_compounds, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: classes_of_compounds,
@@ -207,8 +206,8 @@ pub async fn get_empirical_formulas(
         &EmpiricalFormula {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((empirical_formulas, count)) => Ok(Json((empirical_formulas, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -227,8 +226,8 @@ pub async fn get_empirical_formulas_old(
         &EmpiricalFormula {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((empirical_formulas, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: empirical_formulas,
@@ -250,8 +249,8 @@ pub async fn get_linear_formulas(
         &LinearFormula {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((linear_formulas, count)) => Ok(Json((linear_formulas, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -270,8 +269,8 @@ pub async fn get_linear_formulas_old(
         &LinearFormula {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((linear_formulas, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: linear_formulas,
@@ -293,8 +292,8 @@ pub async fn get_names(
         &Name {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((names, count)) => Ok(Json((names, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -313,8 +312,8 @@ pub async fn get_names_old(
         &Name {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((names, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: names,
@@ -336,8 +335,8 @@ pub async fn get_physical_states(
         &PhysicalState {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((physical_states, count)) => Ok(Json((physical_states, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -356,8 +355,8 @@ pub async fn get_physical_states_old(
         &PhysicalState {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((physical_states, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: physical_states,
@@ -379,8 +378,8 @@ pub async fn get_symbols(
         &Symbol {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((symbols, count)) => Ok(Json((symbols, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -399,8 +398,8 @@ pub async fn get_symbols_old(
         &Symbol {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((symbols, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: symbols,
@@ -422,8 +421,8 @@ pub async fn get_tags(
         &Tag {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((tags, count)) => Ok(Json((tags, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -442,8 +441,8 @@ pub async fn get_tags_old(
         &Tag {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((tags, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: tags,
@@ -465,8 +464,8 @@ pub async fn get_signal_words(
         &SignalWord {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((signal_words, count)) => Ok(Json((signal_words, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -485,8 +484,8 @@ pub async fn get_signal_words_old(
         &SignalWord {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((signal_words, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: signal_words,
@@ -505,8 +504,8 @@ pub async fn get_hazard_statements(
     let db_connection = db_connection_pool.get().unwrap();
 
     match chimitheque_db::hazardstatement::get_hazard_statements(
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((hazard_statements, count)) => Ok(Json((hazard_statements, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -522,8 +521,8 @@ pub async fn get_hazard_statements_old(
     let db_connection = db_connection_pool.get().unwrap();
 
     match chimitheque_db::hazardstatement::get_hazard_statements(
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((hazard_statements, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: hazard_statements,
@@ -542,8 +541,8 @@ pub async fn get_precautionary_statements(
     let db_connection = db_connection_pool.get().unwrap();
 
     match chimitheque_db::precautionarystatement::get_precautionary_statements(
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((precautionary_statements, count)) => Ok(Json((precautionary_statements, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -559,8 +558,8 @@ pub async fn get_precautionary_statements_old(
     let db_connection = db_connection_pool.get().unwrap();
 
     match chimitheque_db::precautionarystatement::get_precautionary_statements(
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((precautionary_statements, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: precautionary_statements,
@@ -582,8 +581,8 @@ pub async fn get_producers(
         &Producer {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((producers, count)) => Ok(Json((producers, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -602,8 +601,8 @@ pub async fn get_producers_old(
         &Producer {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((producers, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: producers,
@@ -625,8 +624,8 @@ pub async fn get_suppliers(
         &Supplier {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((suppliers, count)) => Ok(Json((suppliers, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -645,8 +644,8 @@ pub async fn get_suppliers_old(
         &Supplier {
             ..Default::default()
         },
-        db_connection.deref(),
-        request_filter,
+        &db_connection,
+        &request_filter,
     ) {
         Ok((suppliers, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: suppliers,
@@ -664,7 +663,7 @@ pub async fn get_producer_refs(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::producerref::get_producer_refs(db_connection.deref(), request_filter) {
+    match chimitheque_db::producerref::get_producer_refs(&db_connection, &request_filter) {
         Ok((producer_refs, count)) => Ok(Json((producer_refs, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
@@ -678,7 +677,7 @@ pub async fn get_producer_refs_old(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::producerref::get_producer_refs(db_connection.deref(), request_filter) {
+    match chimitheque_db::producerref::get_producer_refs(&db_connection, &request_filter) {
         Ok((producer_refs, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: producer_refs,
             total: count,
@@ -695,7 +694,7 @@ pub async fn get_supplier_refs(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::supplierref::get_supplier_refs(db_connection.deref(), request_filter) {
+    match chimitheque_db::supplierref::get_supplier_refs(&db_connection, &request_filter) {
         Ok((supplier_refs, count)) => Ok(Json((supplier_refs, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
@@ -709,7 +708,7 @@ pub async fn get_supplier_refs_old(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::supplierref::get_supplier_refs(db_connection.deref(), request_filter) {
+    match chimitheque_db::supplierref::get_supplier_refs(&db_connection, &request_filter) {
         Ok((supplier_refs, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: supplier_refs,
             total: count,
@@ -726,7 +725,7 @@ pub async fn get_units(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::unit::get_units(db_connection.deref(), request_filter) {
+    match chimitheque_db::unit::get_units(&db_connection, request_filter) {
         Ok((units, count)) => Ok(Json((units, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
@@ -740,7 +739,7 @@ pub async fn get_units_old(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::unit::get_units(db_connection.deref(), request_filter) {
+    match chimitheque_db::unit::get_units(&db_connection, request_filter) {
         Ok((units, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: units,
             total: count,
@@ -761,7 +760,7 @@ pub async fn create_producer(
     let mut producer = producer.clone();
     if let Err(err) = producer.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
-    };
+    }
 
     match chimitheque_db::searchable::create_update(
         &Producer {
@@ -789,7 +788,7 @@ pub async fn create_supplier(
     let mut supplier = supplier.clone();
     if let Err(err) = supplier.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
-    };
+    }
 
     match chimitheque_db::searchable::create_update(
         &Supplier {

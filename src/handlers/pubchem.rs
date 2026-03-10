@@ -8,7 +8,6 @@ use chimitheque_pubchem::{
 use chimitheque_types::pubchemproduct::PubchemProduct;
 use http::HeaderMap;
 use serde::Deserialize;
-use std::ops::{Deref, DerefMut};
 use tracing::info;
 
 use crate::{appstate::AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
@@ -19,9 +18,9 @@ pub async fn pubchem_autocomplete(
 ) -> Result<Json<Autocomplete>, AppError> {
     let rate_limiter = state.rate_limiter;
 
-    match autocomplete(rate_limiter.deref(), name.as_str()) {
+    match autocomplete(&rate_limiter, name.as_str()) {
         Ok(autocomplete) => Ok(Json(autocomplete)),
-        Err(err) => Err(AppError::Pubchem(err.to_string())),
+        Err(err) => Err(AppError::Pubchem(err.clone())),
     }
 }
 
@@ -31,9 +30,9 @@ pub async fn pubchem_getcompoundbyname(
 ) -> Result<Json<Record>, AppError> {
     let rate_limiter = state.rate_limiter;
 
-    match get_compound_by_name(rate_limiter.deref(), name.as_str()) {
+    match get_compound_by_name(&rate_limiter, name.as_str()) {
         Ok(record) => Ok(Json(record)),
-        Err(err) => Err(AppError::Pubchem(err.to_string())),
+        Err(err) => Err(AppError::Pubchem(err.clone())),
     }
 }
 
@@ -43,9 +42,9 @@ pub async fn pubchem_getproductbyname(
 ) -> Result<Json<Option<PubchemProduct>>, AppError> {
     let rate_limiter = state.rate_limiter;
 
-    match get_product_by_name(rate_limiter.deref(), name.as_str()) {
+    match get_product_by_name(&rate_limiter, name.as_str()) {
         Ok(maybe_pubchemproduct) => Ok(Json(maybe_pubchemproduct)),
-        Err(err) => Err(AppError::Pubchem(err.to_string())),
+        Err(err) => Err(AppError::Pubchem(err.clone())),
     }
 }
 
@@ -76,10 +75,10 @@ pub async fn pubchem_create_update_product(
     let mut product_id: Option<u64> = None;
     if path_params.id > 0 {
         product_id = Some(path_params.id);
-    };
+    }
 
     let mayerr_product_id = chimitheque_db::pubchemproduct::create_update_product_from_pubchem(
-        db_connection.deref_mut(),
+        &mut db_connection,
         pubchem_product,
         chimitheque_person_id,
         product_id,

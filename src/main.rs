@@ -17,5 +17,5 @@ async fn main() {
         keycloak_realm,
         keycloak_client_id,
     )
-    .await
+    .await;
 }

@@ -18,7 +18,7 @@ pub async fn validate_cas_number_old(
     Query(params): Query<CasQuery>,
 ) -> Result<Json<bool>, AppError> {
     match is_cas_number(params.cas_number.trim()) {
-        Ok(_) => Ok(Json(true)),
+        Ok(()) => Ok(Json(true)),
         Err(err) => Err(AppError::InputValidation(err.to_string())),
     }
 }
@@ -30,7 +30,7 @@ pub struct CeQuery {
 
 pub async fn validate_ce_number_old(Query(params): Query<CeQuery>) -> Result<Json<bool>, AppError> {
     match is_ce_number(params.ce_number.trim()) {
-        Ok(_) => Ok(Json(true)),
+        Ok(()) => Ok(Json(true)),
         Err(err) => Err(AppError::InputValidation(err.to_string())),
     }
 }

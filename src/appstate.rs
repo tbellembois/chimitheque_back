@@ -16,7 +16,7 @@ use governor::{
 };
 use r2d2::{self, Pool};
 use r2d2_sqlite::SqliteConnectionManager;
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::error;
 
@@ -47,7 +47,7 @@ pub async fn init_casbin_enforcer(
         Err(err) => return Err(AppError::DatabasePool(err.to_string())),
     };
 
-    let casbin_string_adapter = to_string_adapter(db_connection_pool.deref()).unwrap();
+    let casbin_string_adapter = to_string_adapter(&db_connection_pool).unwrap();
     let casbin_model = DefaultModel::from_str(include_str!("casbin/policy.conf"))
         .await
         .unwrap();
@@ -94,7 +94,7 @@ pub async fn init_casbin_enforcer(
                 }
             };
 
-            let result = match match_product_has_storages(db_connection.deref(), product_id) {
+            let result = match match_product_has_storages(&db_connection, product_id) {
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match product has storages: {}", err);
@@ -156,7 +156,7 @@ pub async fn init_casbin_enforcer(
                 };
 
                 let result = match match_store_location_is_in_entity(
-                    db_connection.deref(),
+                    &db_connection,
                     store_location_id,
                     entity_id,
                 ) {
@@ -218,7 +218,7 @@ pub async fn init_casbin_enforcer(
             };
 
             let result =
-                match match_storage_is_in_entity(db_connection.deref(), storage_id, entity_id) {
+                match match_storage_is_in_entity(&db_connection, storage_id, entity_id) {
                     Ok(result) => result,
                     Err(err) => {
                         error!("failed to match storage is in entity: {}", err);
@@ -262,7 +262,7 @@ pub async fn init_casbin_enforcer(
             };
 
             let result =
-                match match_store_location_has_children(db_connection.deref(), store_location_id) {
+                match match_store_location_has_children(&db_connection, store_location_id) {
                     Ok(result) => result,
                     Err(err) => {
                         error!("failed to match store location has children: {}", err);
@@ -306,7 +306,7 @@ pub async fn init_casbin_enforcer(
             };
 
             let result =
-                match match_store_location_has_storages(db_connection.deref(), store_location_id) {
+                match match_store_location_has_storages(&db_connection, store_location_id) {
                     Ok(result) => result,
                     Err(err) => {
                         error!("failed to match store location has storages: {}", err);
@@ -364,7 +364,7 @@ pub async fn init_casbin_enforcer(
             };
 
             let result =
-                match match_person_is_in_entity(db_connection.deref(), person_id, entity_id) {
+                match match_person_is_in_entity(&db_connection, person_id, entity_id) {
                     Ok(result) => result,
                     Err(err) => {
                         error!("failed to match person is in entity: {}", err);
@@ -404,7 +404,7 @@ pub async fn init_casbin_enforcer(
                 }
             };
 
-            let result = match match_person_is_admin(db_connection.deref(), person_id) {
+            let result = match match_person_is_admin(&db_connection, person_id) {
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match person is admin: {}", err);
@@ -444,7 +444,7 @@ pub async fn init_casbin_enforcer(
                 }
             };
 
-            let result = match match_person_is_manager(db_connection.deref(), person_id) {
+            let result = match match_person_is_manager(&db_connection, person_id) {
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match person is manager: {}", err);
@@ -484,7 +484,7 @@ pub async fn init_casbin_enforcer(
                 }
             };
 
-            let result = match match_entity_has_members(db_connection.deref(), entity_id) {
+            let result = match match_entity_has_members(&db_connection, entity_id) {
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match entity has members: {}", err);
@@ -524,7 +524,7 @@ pub async fn init_casbin_enforcer(
                 }
             };
 
-            let result = match match_entity_has_members(db_connection.deref(), entity_id) {
+            let result = match match_entity_has_members(&db_connection, entity_id) {
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match entity has store locations: {}", err);
