@@ -4,7 +4,7 @@ use axum::{
     http::HeaderMap,
 };
 use axum_extra::extract::Query;
-use chimitheque_types::{requestfilter::RequestFilter, storage::Storage};
+use chimitheque_types::{person::Person, requestfilter::RequestFilter, storage::Storage};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -105,11 +105,18 @@ pub struct CreateUpdateStoragePathParameters {
 
 pub async fn create_update_storage(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Query(mut query_params): Query<CreateUpdateStorageQueryParameters>,
     Path(path_params): Path<CreateUpdateStoragePathParameters>,
     Json(storage): Json<Storage>,
 ) -> Result<Json<Vec<u64>>, AppError> {
     info!("create_update_storage: {}", storage);
+
+    // Get the chimitheque_person_id.
+    let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
+        Ok(chimitheque_person_id) => chimitheque_person_id,
+        Err(err) => return Err(err),
+    };
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -120,6 +127,12 @@ pub async fn create_update_storage(
     if let Err(err) = storage.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
     }
+
+    // Set storage person.
+    storage.person = Person {
+        person_id: Some(chimitheque_person_id),
+        ..Default::default()
+    };
 
     // update?
     if path_params.id > 0 {

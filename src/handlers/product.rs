@@ -3,7 +3,7 @@ use axum::{
     extract::{Path, State},
     http::HeaderMap,
 };
-use chimitheque_types::{product::Product, requestfilter::RequestFilter};
+use chimitheque_types::{person::Person, product::Product, requestfilter::RequestFilter};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -94,10 +94,17 @@ pub struct CreateUpdateProductPathParameters {
 
 pub async fn create_update_product(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(path_params): Path<CreateUpdateProductPathParameters>,
     Json(product): Json<Product>,
 ) -> Result<Json<u64>, AppError> {
     info!("create_update_product: {}", product);
+
+    // Get the chimitheque_person_id.
+    let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
+        Ok(chimitheque_person_id) => chimitheque_person_id,
+        Err(err) => return Err(err),
+    };
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -108,6 +115,12 @@ pub async fn create_update_product(
     if let Err(err) = product.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
     }
+
+    // Set product person.
+    product.person = Person {
+        person_id: Some(chimitheque_person_id),
+        ..Default::default()
+    };
 
     // update?
     if path_params.id > 0 {
