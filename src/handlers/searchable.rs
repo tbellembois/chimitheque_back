@@ -50,13 +50,7 @@ pub async fn get_cas_numbers_old(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match get_many(
-        &CasNumber {
-            ..Default::default()
-        },
-        &db_connection,
-        &request_filter,
-    ) {
+    match get_many(&CasNumber::default(), &db_connection, &request_filter) {
         Ok((cas_numbers, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: cas_numbers,
             total: count,
@@ -503,10 +497,7 @@ pub async fn get_hazard_statements(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::hazardstatement::get_hazard_statements(
-        &db_connection,
-        &request_filter,
-    ) {
+    match chimitheque_db::hazardstatement::get_hazard_statements(&db_connection, &request_filter) {
         Ok((hazard_statements, count)) => Ok(Json((hazard_statements, count))),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
@@ -520,10 +511,7 @@ pub async fn get_hazard_statements_old(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    match chimitheque_db::hazardstatement::get_hazard_statements(
-        &db_connection,
-        &request_filter,
-    ) {
+    match chimitheque_db::hazardstatement::get_hazard_statements(&db_connection, &request_filter) {
         Ok((hazard_statements, count)) => Ok(Json(Box::new(GetSearchableOldResponse {
             rows: hazard_statements,
             total: count,

@@ -21,10 +21,7 @@ use crate::{
         product::{
             create_update_product, delete_product, export_products, get_products, get_products_old,
         },
-        pubchem::{
-            pubchem_autocomplete, pubchem_create_update_product, pubchem_getcompoundbyname,
-            pubchem_getproductbyname,
-        },
+        pubchem::{pubchem_autocomplete, pubchem_create_update_product, pubchem_getproductbyname},
         searchable::{
             create_producer, create_supplier, get_cas_numbers, get_cas_numbers_old, get_categories,
             get_categories_old, get_ce_numbers, get_ce_numbers_old, get_classes_of_compounds,
@@ -802,10 +799,11 @@ pub async fn run(
             "/products/pubchemautocomplete/{name}",
             get(pubchem_autocomplete),
         )
-        .route(
-            "/products/pubchemgetcompoundbyname/{name}",
-            get(pubchem_getcompoundbyname),
-        )
+        // not used
+        // .route(
+        //     "/products/pubchemgetcompoundbyname/{name}",
+        //     get(pubchem_getcompoundbyname),
+        // )
         .route(
             "/products/pubchemgetproductbyname/{name}",
             get(pubchem_getproductbyname),

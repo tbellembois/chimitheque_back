@@ -1,12 +1,9 @@
 use axum::extract::Path;
 use axum::{Json, extract::State};
-use chimitheque_pubchem::{pubchem::get_product_by_name, pubchem_compound::Autocomplete};
-use chimitheque_pubchem::{
-    pubchem::{autocomplete, get_compound_by_name},
-    pubchem_compound::Record,
-};
+use chimitheque_pubchem::pubchem::autocomplete;
+use chimitheque_pubchem::pubchem::get_product_by_name;
 use chimitheque_types::pubchemproduct::PubchemProduct;
-use http::HeaderMap;
+use http::{HeaderMap, HeaderValue};
 use serde::Deserialize;
 use tracing::info;
 
@@ -15,35 +12,58 @@ use crate::{appstate::AppState, errors::AppError, utils::get_chimitheque_person_
 pub async fn pubchem_autocomplete(
     State(state): State<AppState>,
     Path(name): Path<String>,
-) -> Result<Json<Autocomplete>, AppError> {
+) -> Result<impl axum::response::IntoResponse, AppError> {
     let rate_limiter = state.rate_limiter;
 
     match autocomplete(&rate_limiter, name.as_str()) {
-        Ok(autocomplete) => Ok(Json(autocomplete)),
+        Ok((autocomplete, header)) => {
+            let mut response = axum::http::Response::new(axum::body::Body::from(
+                serde_json::to_string(&autocomplete).unwrap(),
+            ));
+            response.headers_mut().insert(
+                "X-Throttling-Control",
+                HeaderValue::from_str(header.as_str()).unwrap_or(HeaderValue::from_static(
+                    "X-Throttling-Control header convertion error",
+                )),
+            );
+            Ok(response)
+        }
         Err(err) => Err(AppError::Pubchem(err.clone())),
     }
 }
 
-pub async fn pubchem_getcompoundbyname(
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-) -> Result<Json<Record>, AppError> {
-    let rate_limiter = state.rate_limiter;
+// not used
+// pub async fn pubchem_getcompoundbyname(
+//     State(state): State<AppState>,
+//     Path(name): Path<String>,
+// ) -> Result<Json<Record>, AppError> {
+//     let rate_limiter = state.rate_limiter;
 
-    match get_compound_by_name(&rate_limiter, name.as_str()) {
-        Ok(record) => Ok(Json(record)),
-        Err(err) => Err(AppError::Pubchem(err.clone())),
-    }
-}
+//     match get_compound_by_name(&rate_limiter, name.as_str()) {
+//         Ok(record) => Ok(Json(record)),
+//         Err(err) => Err(AppError::Pubchem(err.clone())),
+//     }
+// }
 
 pub async fn pubchem_getproductbyname(
     State(state): State<AppState>,
     Path(name): Path<String>,
-) -> Result<Json<Option<PubchemProduct>>, AppError> {
+) -> Result<impl axum::response::IntoResponse, AppError> {
     let rate_limiter = state.rate_limiter;
 
     match get_product_by_name(&rate_limiter, name.as_str()) {
-        Ok(maybe_pubchemproduct) => Ok(Json(maybe_pubchemproduct)),
+        Ok((maybe_pubchemproduct, header)) => {
+            let mut response = axum::http::Response::new(axum::body::Body::from(
+                serde_json::to_string(&maybe_pubchemproduct).unwrap(),
+            ));
+            response.headers_mut().insert(
+                "X-Throttling-Control",
+                HeaderValue::from_str(header.as_str()).unwrap_or(HeaderValue::from_static(
+                    "X-Throttling-Control header convertion error",
+                )),
+            );
+            Ok(response)
+        }
         Err(err) => Err(AppError::Pubchem(err.clone())),
     }
 }
