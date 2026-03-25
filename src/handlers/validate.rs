@@ -3,7 +3,7 @@ use axum::{
     extract::{Path, Query},
 };
 use chimitheque_utils::{
-    casnumber::is_cas_number, cenumber::is_ce_number, formula::sort_empirical_formula,
+    casnumber::is_cas_number, cenumber::is_ce_number, formula::to_empirical_formula,
 };
 use serde::Deserialize;
 
@@ -43,7 +43,7 @@ pub struct EmpiricalFormulaQuery {
 pub async fn validate_empirical_formula_old(
     Query(params): Query<EmpiricalFormulaQuery>,
 ) -> Result<Json<bool>, AppError> {
-    match sort_empirical_formula(params.empirical_formula.trim()) {
+    match to_empirical_formula(params.empirical_formula.trim()) {
         Ok(_) => Ok(Json(true)),
         Err(err) => Err(AppError::InputValidation(err.to_string())),
     }
@@ -57,7 +57,7 @@ pub struct LinearToEmpiricalFormulaPathParameters {
 pub async fn linear_to_empirical_formula(
     Path(path_params): Path<LinearToEmpiricalFormulaPathParameters>,
 ) -> Result<Json<String>, AppError> {
-    match sort_empirical_formula(path_params.linear_formula.trim()) {
+    match to_empirical_formula(path_params.linear_formula.trim()) {
         Ok(empirical_formula) => Ok(Json(empirical_formula)),
         Err(err) => Err(AppError::InputValidation(err.to_string())),
     }

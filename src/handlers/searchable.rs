@@ -8,7 +8,6 @@ use chimitheque_types::{
     requestfilter::RequestFilter, signalword::SignalWord, supplier::Supplier,
     supplierref::SupplierRef, symbol::Symbol, tag::Tag, unit::Unit,
 };
-use chimitheque_utils::string::Transform;
 use serde::{Deserialize, Serialize};
 
 use crate::{appstate::AppState, errors::AppError};
@@ -757,7 +756,6 @@ pub async fn create_producer(
         None,
         &db_connection,
         &producer.producer_label,
-        Transform::None,
     ) {
         Ok(producer_id) => Ok(Json(producer_id)),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -785,7 +783,6 @@ pub async fn create_supplier(
         None,
         &db_connection,
         &supplier.supplier_label,
-        Transform::None,
     ) {
         Ok(supplier_id) => Ok(Json(supplier_id)),
         Err(err) => Err(AppError::Database(err.to_string())),
