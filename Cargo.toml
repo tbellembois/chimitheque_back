@@ -24,11 +24,11 @@ axum-extra = { version = "0.12.3", features = ["query"] }
 axum-oidc-layer = "0.1"
 base64 = "0.22.1"
 casbin = { git = "https://github.com/casbin/casbin-rs.git", branch = "copilot/fix-db-connection-in-operator-function",  default-features = false, features = ["runtime-async-std", "logging", "incremental"] }
-chrono = "0.4.42"
+chrono = "0.4.44"
 dashmap = "6.1.0"
 dotenvy = "0.15"
 erased-serde = "0.3.31"
-governor = "0.10.1"
+governor = "0.10.4"
 http = "1.4.0"
 jsonwebtoken = {version="10.2.0", features=["rust_crypto"]}
 lazy_static = "1.5.0"
@@ -37,11 +37,11 @@ opentelemetry = "0.22"
 opentelemetry-otlp = { version = "0.15", features = ["grpc-tonic"] }
 opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
 r2d2 = "0.8.10"
-r2d2_sqlite = "0.24.0"
+r2d2_sqlite = "0.25.0"
 rand = "0.9.2"
 regex = "1.12.2"
 reqwest = { version = "0.13", features = ["json","blocking"] }
-rusqlite = { version = "0.31.0", features = ["load_extension", "bundled"] }
+rusqlite = { version = "0.32.0", features = ["load_extension", "bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.145"
 sha2 = "0.10.9"
