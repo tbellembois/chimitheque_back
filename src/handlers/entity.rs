@@ -3,21 +3,23 @@ use axum::{
     extract::{Path, State},
     http::HeaderMap,
 };
-use chimitheque_types::{entity::Entity, requestfilter::RequestFilter, stock::Stock};
+use chimitheque_types::{entity::Entity, stock::Stock};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::{
-    AppState, appstate::init_casbin_enforcer, errors::AppError,
-    utils::get_chimitheque_person_id_from_headers,
+    AppState, appstate::init_casbin_enforcer, axumrequestfilter::AxumRequestFilter,
+    errors::AppError, utils::get_chimitheque_person_id_from_headers,
 };
 
 pub async fn get_entities(
     State(state): State<AppState>,
     headers: HeaderMap,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<Entity>, usize)>, AppError> {
     info!("get_entities");
+
+    let request_filter = axum_request_filter.0;
 
     // Get the chimitheque_entity_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
@@ -29,11 +31,8 @@ pub async fn get_entities(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    let mayerr_entities = chimitheque_db::entity::get_entities(
-        &db_connection,
-        request_filter,
-        chimitheque_person_id,
-    );
+    let mayerr_entities =
+        chimitheque_db::entity::get_entities(&db_connection, request_filter, chimitheque_person_id);
 
     match mayerr_entities {
         Ok(entities) => Ok(Json(entities)),
@@ -50,9 +49,11 @@ pub struct GetEntitiesOldResponse {
 pub async fn get_entities_old(
     State(state): State<AppState>,
     headers: HeaderMap,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
     info!("get_entities_old");
+
+    let request_filter = axum_request_filter.0;
 
     // Get the chimitheque_entity_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
@@ -114,8 +115,7 @@ pub async fn create_update_entity(
         entity.entity_id = Some(path_params.id);
     }
 
-    let mayerr_entity_id =
-        chimitheque_db::entity::create_update_entity(&mut db_connection, entity);
+    let mayerr_entity_id = chimitheque_db::entity::create_update_entity(&mut db_connection, entity);
 
     init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
 

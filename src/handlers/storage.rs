@@ -4,18 +4,23 @@ use axum::{
     http::HeaderMap,
 };
 use axum_extra::extract::Query;
-use chimitheque_types::{person::Person, requestfilter::RequestFilter, storage::Storage};
+use chimitheque_types::{person::Person, storage::Storage};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
+use crate::{
+    AppState, axumrequestfilter::AxumRequestFilter, errors::AppError,
+    utils::get_chimitheque_person_id_from_headers,
+};
 
 pub async fn get_storages(
     State(state): State<AppState>,
     headers: HeaderMap,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<Storage>, usize)>, AppError> {
     info!("get_storages");
+
+    let request_filter = axum_request_filter.0;
 
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
@@ -48,9 +53,11 @@ pub struct GetStoragesOldResponse {
 pub async fn get_storages_old(
     State(state): State<AppState>,
     headers: HeaderMap,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
     info!("get_storages_old");
+
+    let request_filter = axum_request_filter.0;
 
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
@@ -176,9 +183,11 @@ pub async fn delete_storage(
 pub async fn export_storages(
     State(state): State<AppState>,
     headers: HeaderMap,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<String, AppError> {
     info!("export_storages");
+
+    let request_filter = axum_request_filter.0;
 
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {

@@ -5,17 +5,19 @@ use chimitheque_types::{
     casnumber::CasNumber, category::Category, cenumber::CeNumber, classofcompound::ClassOfCompound,
     empiricalformula::EmpiricalFormula, linearformula::LinearFormula, name::Name,
     physicalstate::PhysicalState, producer::Producer, producerref::ProducerRef,
-    requestfilter::RequestFilter, signalword::SignalWord, supplier::Supplier,
-    supplierref::SupplierRef, symbol::Symbol, tag::Tag, unit::Unit,
+    signalword::SignalWord, supplier::Supplier, supplierref::SupplierRef, symbol::Symbol, tag::Tag,
+    unit::Unit,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{appstate::AppState, errors::AppError};
+use crate::{appstate::AppState, axumrequestfilter::AxumRequestFilter, errors::AppError};
 
 pub async fn get_cas_numbers(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -43,8 +45,10 @@ where
 
 pub async fn get_cas_numbers_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -60,8 +64,10 @@ pub async fn get_cas_numbers_old(
 
 pub async fn get_ce_numbers(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -80,8 +86,10 @@ pub async fn get_ce_numbers(
 
 pub async fn get_ce_numbers_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -103,8 +111,10 @@ pub async fn get_ce_numbers_old(
 
 pub async fn get_categories(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -123,8 +133,10 @@ pub async fn get_categories(
 
 pub async fn get_categories_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -146,8 +158,10 @@ pub async fn get_categories_old(
 
 pub async fn get_classes_of_compounds(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -166,8 +180,10 @@ pub async fn get_classes_of_compounds(
 
 pub async fn get_classes_of_compounds_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -189,8 +205,10 @@ pub async fn get_classes_of_compounds_old(
 
 pub async fn get_empirical_formulas(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -209,8 +227,10 @@ pub async fn get_empirical_formulas(
 
 pub async fn get_empirical_formulas_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -232,8 +252,10 @@ pub async fn get_empirical_formulas_old(
 
 pub async fn get_linear_formulas(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -252,8 +274,10 @@ pub async fn get_linear_formulas(
 
 pub async fn get_linear_formulas_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -275,8 +299,10 @@ pub async fn get_linear_formulas_old(
 
 pub async fn get_names(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -295,8 +321,10 @@ pub async fn get_names(
 
 pub async fn get_names_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -318,8 +346,10 @@ pub async fn get_names_old(
 
 pub async fn get_physical_states(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -338,8 +368,10 @@ pub async fn get_physical_states(
 
 pub async fn get_physical_states_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -361,8 +393,10 @@ pub async fn get_physical_states_old(
 
 pub async fn get_symbols(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -381,8 +415,10 @@ pub async fn get_symbols(
 
 pub async fn get_symbols_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -404,8 +440,10 @@ pub async fn get_symbols_old(
 
 pub async fn get_tags(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -424,8 +462,10 @@ pub async fn get_tags(
 
 pub async fn get_tags_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -447,8 +487,10 @@ pub async fn get_tags_old(
 
 pub async fn get_signal_words(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -467,8 +509,10 @@ pub async fn get_signal_words(
 
 pub async fn get_signal_words_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -490,8 +534,10 @@ pub async fn get_signal_words_old(
 
 pub async fn get_hazard_statements(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -504,8 +550,10 @@ pub async fn get_hazard_statements(
 
 pub async fn get_hazard_statements_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -521,8 +569,10 @@ pub async fn get_hazard_statements_old(
 
 pub async fn get_precautionary_statements(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -538,8 +588,10 @@ pub async fn get_precautionary_statements(
 
 pub async fn get_precautionary_statements_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -558,8 +610,10 @@ pub async fn get_precautionary_statements_old(
 
 pub async fn get_producers(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -578,8 +632,10 @@ pub async fn get_producers(
 
 pub async fn get_producers_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -601,8 +657,10 @@ pub async fn get_producers_old(
 
 pub async fn get_suppliers(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<impl Searchable + Serialize>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -621,8 +679,10 @@ pub async fn get_suppliers(
 
 pub async fn get_suppliers_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -644,8 +704,10 @@ pub async fn get_suppliers_old(
 
 pub async fn get_producer_refs(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<ProducerRef>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -658,8 +720,10 @@ pub async fn get_producer_refs(
 
 pub async fn get_producer_refs_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -675,8 +739,10 @@ pub async fn get_producer_refs_old(
 
 pub async fn get_supplier_refs(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<SupplierRef>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -689,8 +755,10 @@ pub async fn get_supplier_refs(
 
 pub async fn get_supplier_refs_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -706,8 +774,10 @@ pub async fn get_supplier_refs_old(
 
 pub async fn get_units(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<Unit>, usize)>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
@@ -720,8 +790,10 @@ pub async fn get_units(
 
 pub async fn get_units_old(
     State(state): State<AppState>,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+    let request_filter = axum_request_filter.0;
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();

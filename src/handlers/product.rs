@@ -3,18 +3,23 @@ use axum::{
     extract::{Path, State},
     http::HeaderMap,
 };
-use chimitheque_types::{person::Person, product::Product, requestfilter::RequestFilter};
+use chimitheque_types::{person::Person, product::Product};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::{AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
+use crate::{
+    AppState, axumrequestfilter::AxumRequestFilter, errors::AppError,
+    utils::get_chimitheque_person_id_from_headers,
+};
 
 pub async fn get_products(
     State(state): State<AppState>,
     headers: HeaderMap,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
     info!("get_products");
+
+    let request_filter = axum_request_filter.0;
 
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
@@ -57,9 +62,11 @@ pub struct GetProductsOldResponse {
 pub async fn get_products_old(
     State(state): State<AppState>,
     headers: HeaderMap,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<GetProductsOldResponse>, AppError> {
     info!("get_products_old");
+
+    let request_filter = axum_request_filter.0;
 
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
@@ -155,9 +162,11 @@ pub async fn delete_product(
 pub async fn export_products(
     State(state): State<AppState>,
     headers: HeaderMap,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<String, AppError> {
     info!("export_products");
+
+    let request_filter = axum_request_filter.0;
 
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {

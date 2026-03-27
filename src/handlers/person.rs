@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::{
-    AppState, appstate::init_casbin_enforcer, errors::AppError,
-    utils::get_chimitheque_person_id_from_headers,
+    AppState, appstate::init_casbin_enforcer, axumrequestfilter::AxumRequestFilter,
+    errors::AppError, utils::get_chimitheque_person_id_from_headers,
 };
 
 pub async fn get_connected_user(
@@ -48,9 +48,11 @@ pub async fn get_connected_user(
 pub async fn get_people(
     State(state): State<AppState>,
     headers: HeaderMap,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<(Vec<Person>, usize)>, AppError> {
     info!("get_people");
+
+    let request_filter = axum_request_filter.0;
 
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
@@ -62,11 +64,8 @@ pub async fn get_people(
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
 
-    let mayerr_people = chimitheque_db::person::get_people(
-        &db_connection,
-        &request_filter,
-        chimitheque_person_id,
-    );
+    let mayerr_people =
+        chimitheque_db::person::get_people(&db_connection, &request_filter, chimitheque_person_id);
 
     match mayerr_people {
         Ok(people) => Ok(Json(people)),
@@ -83,9 +82,11 @@ pub struct GetPeopleOldResponse {
 pub async fn get_people_old(
     State(state): State<AppState>,
     headers: HeaderMap,
-    request_filter: RequestFilter,
+    axum_request_filter: AxumRequestFilter,
 ) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
     info!("get_people_old");
+
+    let request_filter = axum_request_filter.0;
 
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
@@ -147,8 +148,7 @@ pub async fn create_update_person(
         person.person_id = Some(path_params.id);
     }
 
-    let mayerr_person_id =
-        chimitheque_db::person::create_update_person(&mut db_connection, person);
+    let mayerr_person_id = chimitheque_db::person::create_update_person(&mut db_connection, person);
 
     init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
 

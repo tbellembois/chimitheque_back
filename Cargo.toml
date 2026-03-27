@@ -10,7 +10,7 @@ homepage = "https://github.com/tbellembois/chimitheque_back"
 readme = "README.md"
 categories = ["database", "science"]
 keywords = ["chemistry", "biology", "database", "management"]
-rust-version = "1.94.0"
+rust-version = "1.94.1"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -19,7 +19,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = { version = "0.8", features = [ "macros" ]}
+axum = { version = "0.8.8", features = [ "macros" ]}
 axum-extra = { version = "0.12.3", features = ["query"] }
 casbin = { git = "https://github.com/casbin/casbin-rs.git", branch = "copilot/fix-db-connection-in-operator-function",  default-features = false, features = ["runtime-async-std", "logging", "incremental"] }
 dashmap = "6.1.0"
