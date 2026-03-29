@@ -179,6 +179,19 @@ pub async fn jwt_middleware(
 ) -> Response {
     debug!("jwt_middleware");
 
+    // Development mode: bypass auth.
+    if std::env::var("BYPASS_AUTH").is_ok() {
+        let user_email = "admin@chimitheque.fr".to_string();
+        let auth_context = AuthContext {
+            sub: String::default(),
+            email: user_email,
+        };
+
+        req.extensions_mut().insert(auth_context);
+
+        return next.run(req).await;
+    }
+
     // Extract Bearer token.
     let Some(token) = req
         .headers()
@@ -253,7 +266,7 @@ pub async fn jwt_middleware(
     };
     req.extensions_mut().insert(auth_context);
 
-    // ✅ Continue to next middleware/handler
+    // Continue to next middleware/handler.
     next.run(req).await
 }
 
@@ -266,6 +279,16 @@ async fn authenticate_middleware(
     next: Next,
 ) -> Response {
     debug!("authenticate_middleware");
+
+    // Development mode: bypass auth.
+    if std::env::var("BYPASS_AUTH").is_ok() {
+        request.headers_mut().insert(
+            CHIMITHEQUE_PERSON_ID_HEADER,
+            HeaderValue::from_str("1").unwrap(),
+        );
+
+        return next.run(request).await;
+    }
 
     let mut db_connection = state.db_connection_pool.get().unwrap();
 
@@ -363,7 +386,13 @@ async fn authorize_middleware(
 ) -> Response {
     debug!("authorize_middleware");
 
+    // We are not logged in.
     if request.uri().path() == "/login" {
+        return next.run(request).await;
+    }
+
+    // Development mode: bypass auth.
+    if std::env::var("BYPASS_AUTH").is_ok() {
         return next.run(request).await;
     }
 
@@ -732,7 +761,7 @@ pub async fn run(
 
     let app = Router::new()
         //
-        .route("/getconnecteduser", get(get_connected_user))
+        .route("/connecteduser", get(get_connected_user))
         //
         .route("/store_locations", get(get_store_locations))
         .route("/store_locations/{id}", get(get_store_locations))

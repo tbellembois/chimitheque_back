@@ -16,7 +16,7 @@ pub async fn get_products(
     State(state): State<AppState>,
     headers: HeaderMap,
     axum_request_filter: AxumRequestFilter,
-) -> Result<Json<Box<dyn erased_serde::Serialize>>, AppError> {
+) -> Result<Json<(Vec<Product>, usize)>, AppError> {
     info!("get_products");
 
     let request_filter = axum_request_filter.0;
@@ -37,20 +37,25 @@ pub async fn get_products(
         chimitheque_person_id,
     );
 
-    if request_filter.id.is_none() {
-        match mayerr_products {
-            Ok(products) => Ok(Json(Box::new(GetProductsOldResponse {
-                rows: products.0,
-                total: products.1,
-            }))),
-            Err(err) => Err(AppError::Database(err.to_string())),
-        }
-    } else {
-        match mayerr_products {
-            Ok(products) => Ok(Json(Box::new(products.0.first().unwrap().to_owned()))),
-            Err(err) => Err(AppError::Database(err.to_string())),
-        }
+    match mayerr_products {
+        Ok(products) => Ok(Json(products)),
+        Err(err) => Err(AppError::Database(err.to_string())),
     }
+
+    // if request_filter.id.is_none() {
+    //     match mayerr_products {
+    //         Ok(products) => Ok(Json(Box::new(GetProductsOldResponse {
+    //             rows: products.0,
+    //             total: products.1,
+    //         }))),
+    //         Err(err) => Err(AppError::Database(err.to_string())),
+    //     }
+    // } else {
+    //     match mayerr_products {
+    //         Ok(products) => Ok(Json(Box::new(products.0.first().unwrap().to_owned()))),
+    //         Err(err) => Err(AppError::Database(err.to_string())),
+    //     }
+    // }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
