@@ -628,7 +628,7 @@ pub async fn run(
 
     // Getting current admins emails.
     let current_admins: Vec<String> = get_admins(&db_connection)
-        .unwrap()
+        .unwrap_or_default()
         .iter()
         .map(|p| p.person_email.clone())
         .collect();
