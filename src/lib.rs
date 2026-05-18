@@ -227,7 +227,7 @@ pub async fn jwt_middleware(
 
     // Refresh JWKS if older than 10 minutes or kid not found.
     let kid_found = jwks_lock.keys.iter().any(|k| k.kid == kid);
-    if !kid_found || jwks_lock.last_updated.elapsed() > std::time::Duration::from_secs(600) {
+    if !kid_found || jwks_lock.last_updated.elapsed() > std::time::Duration::from_mins(10) {
         let keys = match refresh_jwks(&http_client, &state.keycloak_base_url.clone()) {
             Ok(jwks_cache) => jwks_cache.keys,
             Err(err) => return AppError::RefreshJWKS(err.to_string()).into_response(),
@@ -577,17 +577,6 @@ pub async fn run(
     keycloak_realm: String,
     keycloak_client_id: String,
 ) {
-    // Initialize tracing + log bridging
-    // let fmt_layer = tracing_subscriber::fmt::layer().json();
-    // let filter = EnvFilter::try_from_default_env()
-    //     .or_else(|_| EnvFilter::try_new("chimitheque_back=info,tower_http=warn"))
-    //     .unwrap();
-
-    // tracing_subscriber::registry()
-    //     .with(filter)
-    //     .with(fmt_layer)
-    //     .init();
-
     // Initialize tracing with OpenTelemetry.
     init_tracing_with_opentelemetry();
 
@@ -808,7 +797,6 @@ pub async fn run(
         //
         .route("/stocks/{id}", get(get_entity_stock))
         //
-        .route("/products/export", get(export_products))
         .route("/products", get(get_products))
         .route("/products/{id}", get(get_products))
         .route("/products_old", get(get_products_old))
@@ -830,7 +818,6 @@ pub async fn run(
         .route("/storages/{id}", put(create_update_storage))
         .route("/storages", post(create_update_storage))
         .route("/storages/{id}", delete(delete_storage))
-        .route("/storages/export", get(export_storages))
         .route("/storages/{id}/archive", delete(archive_storage))
         .route("/storages/{id}/unarchive", put(unarchive_storage))
         //
@@ -930,6 +917,8 @@ pub async fn run(
         //     "/validate/empiricalformula/{empirical_formula}",
         //     get(validate_empirical_formula),
         // )
+        .route("/exportstorages", get(export_storages))
+        .route("/exportproducts", get(export_products))
         .route("/validate/casnumber_old", get(validate_cas_number_old))
         .route("/validate/cenumber_old", get(validate_ce_number_old))
         .route(
