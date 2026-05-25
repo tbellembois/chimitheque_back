@@ -740,7 +740,6 @@ dependencies = [
  "chrono",
  "email_address",
  "env_logger 0.10.2",
- "http 1.4.0",
  "jsonpath-rust",
  "log",
  "regex",
