@@ -33,7 +33,7 @@ pub async fn get_store_locations(
 
     let mayerr_store_locations = chimitheque_db::storelocation::get_store_locations(
         &db_connection,
-        request_filter,
+        &request_filter,
         chimitheque_person_id,
     );
 
@@ -70,7 +70,7 @@ pub async fn get_store_locations_old(
 
     let mayerr_store_locations = chimitheque_db::storelocation::get_store_locations(
         &db_connection,
-        request_filter.clone(),
+        &request_filter.clone(),
         chimitheque_person_id,
     );
 

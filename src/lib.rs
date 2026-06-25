@@ -75,7 +75,7 @@ use axum::{
 };
 use casbin::{CoreApi, DefaultModel, Enforcer, NullAdapter};
 use chimitheque_db::{
-    init::{create_tables, populate_db_with_base_data},
+    init::{create_tables, populate_db_with_base_data, sanitize},
     person::{get_admins, set_person_admin, unset_person_admin},
 };
 use chimitheque_types::{person::Person, requestfilter::RequestFilter};
@@ -607,6 +607,7 @@ pub async fn run(
     // Initialize database;
     create_tables(&mut db_connection).unwrap();
     populate_db_with_base_data(&mut db_connection).unwrap();
+    sanitize(&mut db_connection, true).unwrap();
 
     // Capture command line admins - add admin@chimitheque.fr.
     let re = Regex::new(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b").unwrap();
