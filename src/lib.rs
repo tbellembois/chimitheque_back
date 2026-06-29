@@ -102,7 +102,7 @@ use tower_sessions::{
     Expiry, MemoryStore, SessionManagerLayer,
     cookie::{SameSite, time::Duration},
 };
-use tracing::{Span, info_span};
+use tracing::{Span, error, info_span};
 use tracing::{debug, info};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::layer::SubscriberExt;
@@ -563,9 +563,21 @@ fn init_tracing_with_opentelemetry() {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| "chimitheque_back=info,tower_http=warn".into());
 
+    // Plain-text layer for console output
+    let console_layer = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stdout)
+        .with_ansi(true)
+        .without_time();
+
+    // JSON layer for OpenTelemetry
+    let json_layer = tracing_subscriber::fmt::layer()
+        .json()
+        .with_writer(std::io::stderr);
+
     tracing_subscriber::registry()
         .with(filter)
-        .with(tracing_subscriber::fmt::layer().json())
+        .with(console_layer)
+        .with(json_layer)
         .with(otel_layer)
         .init();
 }
@@ -604,10 +616,12 @@ pub async fn run(
     let db_connection_pool = r2d2::Pool::builder().build(manager).unwrap();
     let mut db_connection = db_connection_pool.get().unwrap();
 
-    // Initialize database;
+    // Initialize database.
     create_tables(&mut db_connection).unwrap();
     populate_db_with_base_data(&mut db_connection).unwrap();
-    sanitize(&mut db_connection, true).unwrap();
+    if let Err(err) = sanitize(&mut db_connection, true) {
+        error!("skipping sanitize error: {}", err);
+    }
 
     // Capture command line admins - add admin@chimitheque.fr.
     let re = Regex::new(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b").unwrap();
@@ -737,10 +751,10 @@ pub async fn run(
         .disable_verification(true) // ✨ allow self-signed
         .build();
 
-    // Build request config
+    // Build request config.
     let config = Config::builder().tls_config(tls_config).build();
 
-    // Create shared agent
+    // Create shared agent.
     let http_client = Arc::new(config.new_agent());
 
     let cors = CorsLayer::new()
