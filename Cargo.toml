@@ -69,3 +69,6 @@ chimitheque_db = { path = "../chimitheque_db" }
 
 [patch."https://github.com/tbellembois/chimitheque_pubchem.git"]
 chimitheque_pubchem = { path = "../chimitheque_pubchem" }
+
+[build-dependencies]
+built = { version = "0.7", features = ["chrono", "git2"] }

@@ -12,6 +12,11 @@
     clippy::too_many_lines
 )]
 
+// Include the generated build info.
+mod built_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
+
 pub mod appstate;
 pub mod axumrequestfilter;
 pub mod constants;
@@ -61,6 +66,7 @@ use crate::{
             linear_to_empirical_formula, validate_cas_number_old, validate_ce_number_old,
             validate_empirical_formula_old,
         },
+        version_info::get_version_info,
     },
     utils::get_chimitheque_person_id_from_headers,
 };
@@ -802,6 +808,7 @@ pub async fn run(
     info!("initialize routes");
 
     let app = Router::new()
+        .route("/versioninfo", get(get_version_info))
         //
         .route("/connecteduser", get(get_connected_user))
         //

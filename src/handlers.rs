@@ -9,3 +9,4 @@ pub mod searchable;
 pub mod storage;
 pub mod store_location;
 pub mod validate;
+pub mod version_info;
