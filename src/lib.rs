@@ -605,7 +605,12 @@ pub async fn run(
             unsafe { conn.load_extension_enable() }?;
 
             // Load the extension (example path)
-            unsafe { conn.load_extension(format!("{}/{}", sql_extension_dir, "regex0.so"), None) }?;
+            unsafe {
+                conn.load_extension(
+                    format!("{}/{}", sql_extension_dir, "regex0.so"),
+                    None::<&str>,
+                )
+            }?;
 
             // Disable again for safety
             conn.load_extension_disable()?;
