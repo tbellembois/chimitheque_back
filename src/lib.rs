@@ -89,7 +89,7 @@ use opentelemetry_sdk::{Resource, trace as sdktrace};
 use r2d2::{self};
 use r2d2_sqlite::SqliteConnectionManager;
 use regex::Regex;
-use rusqlite::Connection;
+use rusqlite::{Connection, OpenFlags};
 use serde::Deserialize;
 use std::{env, num::NonZeroU32, sync::Arc};
 use tokio::net::TcpListener;
@@ -595,8 +595,8 @@ pub async fn run(
     // Create DB pool.
     info!("creating DB pool");
 
-    let manager =
-        SqliteConnectionManager::file(db_path.clone()).with_init(|conn: &mut Connection| {
+    let manager = SqliteConnectionManager::file(db_path.clone())
+        .with_init(|conn: &mut Connection| {
             // Load SQLite extensions directory.
             let sql_extension_dir = env::var("SQLITE_EXTENSION_DIR")
                 .expect("Missing SQLITE_EXTENSION_DIR environment variable.");
@@ -615,8 +615,40 @@ pub async fn run(
             // Disable again for safety
             conn.load_extension_disable()?;
 
+            // Set journal mode to WAL and verify the change.
+            conn.pragma_update_and_check(None, "journal_mode", "WAL", |mode| {
+                if mode.get::<_, String>(0) == Ok("wal".to_string()) {
+                    Ok(())
+                } else {
+                    Err(rusqlite::Error::SqliteFailure(
+                        rusqlite::ffi::Error {
+                            code: rusqlite::ffi::ErrorCode::Unknown,
+                            extended_code: 0,
+                        },
+                        Some(format!("Failed to set WAL mode, got: {mode:?}")),
+                    ))
+                }
+            })
+            .expect("Failed to set WAL mode");
+
+            // Enable foreign keys.
+            conn.execute("PRAGMA foreign_keys = ON", [])
+                .expect("Failed to enable foreign keys");
+
+            // Vacuum and analyze.
+            conn.execute("VACUUM", [])
+                .expect("Failed to vacuum database");
+            conn.execute("ANALYZE", [])
+                .expect("Failed to analyze database");
+
             Ok(())
-        });
+        })
+        .with_flags(
+            OpenFlags::default()
+                .union(rusqlite::OpenFlags::SQLITE_OPEN_FULL_MUTEX)
+                .union(rusqlite::OpenFlags::SQLITE_OPEN_CREATE)
+                .union(rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE),
+        );
 
     let db_connection_pool = r2d2::Pool::builder().build(manager).unwrap();
     let mut db_connection = db_connection_pool.get().unwrap();
