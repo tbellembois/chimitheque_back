@@ -618,7 +618,7 @@ pub async fn run(
                 )
             }?;
 
-            // Disable again for safety
+            // Disable again for safety.
             conn.load_extension_disable()?;
 
             // Set journal mode to WAL and verify the change.
@@ -641,6 +641,18 @@ pub async fn run(
             conn.execute("PRAGMA foreign_keys = ON", [])
                 .expect("Failed to enable foreign keys");
 
+            // Set synchronous mode to NORMAL.
+            conn.execute("PRAGMA synchronous = NORMAL", [])
+                .expect("Failed to set synchronous mode");
+
+            // Set cache size to -65536 (64MB).
+            conn.execute("PRAGMA cache_size = -65536", [])
+                .expect("Failed to set cache size");
+
+            // Set temp store to MEMORY to avoid disk I/O.
+            conn.execute("PRAGMA temp_store = MEMORY", [])
+                .expect("Failed to set temp store to MEMORY");
+
             // Vacuum and analyze.
             conn.execute("VACUUM", [])
                 .expect("Failed to vacuum database");
@@ -656,7 +668,7 @@ pub async fn run(
                 .union(rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE),
         );
 
-    let db_connection_pool = r2d2::Pool::builder().build(manager).unwrap();
+    let db_connection_pool = r2d2::Pool::builder().max_size(20).build(manager).unwrap();
     let mut db_connection = db_connection_pool.get().unwrap();
 
     // Initialize database.
