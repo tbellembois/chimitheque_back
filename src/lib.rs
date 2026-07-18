@@ -599,7 +599,7 @@ pub async fn run(
     init_tracing_with_opentelemetry();
 
     // Create DB pool.
-    info!("creating DB pool");
+    info!("creating DB pool for {db_path}");
 
     let manager = SqliteConnectionManager::file(db_path.clone())
         .with_init(|conn: &mut Connection| {
