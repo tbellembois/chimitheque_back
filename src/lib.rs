@@ -1,18 +1,6 @@
-#![warn(clippy::all, clippy::pedantic)]
-// #![warn(
-//     clippy::unwrap_used,
-//     clippy::expect_used,
-//     clippy::panic,
-//     clippy::unreachable
-// )]
-#![allow(
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
-    clippy::struct_excessive_bools,
-    clippy::too_many_lines
-)]
-
 // Include the generated build info.
+// Disable clippy for the generated built.rs file
+#[allow(clippy::all, clippy::pedantic, clippy::nursery)]
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
