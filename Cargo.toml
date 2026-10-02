@@ -47,7 +47,7 @@ opentelemetry-otlp = { version = "0.15", default-features = false, features = ["
 opentelemetry_sdk = { version = "0.22", default-features = false, features = ["rt-tokio"] }
 r2d2 = { version = "0.8.10", default-features = false }
 r2d2_sqlite = { version = "0.32.0", default-features = false }
-regex = { version = "1.12.2", default-features = false }
+regex = { version = "1.13.1", default-features = false }
 rusqlite = { version = "0.38.0", default-features = false, features = ["load_extension", "bundled"] }
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.149", default-features = false }
