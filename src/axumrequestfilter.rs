@@ -12,7 +12,10 @@ where
 {
     type Rejection = (StatusCode, String);
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+    fn from_request_parts(
+        parts: &mut Parts,
+        _state: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> {
         // Build full absolute URL string so RequestFilter::try_from works
         // axum Parts.uri may not contain scheme/host, so we fake it
         let uri = parts.uri.clone();
@@ -23,7 +26,7 @@ where
 
         let full_url = format!("{fake_base}{path_and_query}");
 
-        match RequestFilter::try_from(full_url.as_str()) {
+        std::future::ready(match RequestFilter::try_from(full_url.as_str()) {
             Ok(filter) => Ok(AxumRequestFilter(filter)),
             Err(err) => {
                 // Respond with 400 + error message
@@ -31,6 +34,6 @@ where
                 let response = (StatusCode::BAD_REQUEST, body);
                 Err(response)
             }
-        }
+        })
     }
 }
