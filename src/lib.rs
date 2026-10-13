@@ -625,6 +625,9 @@ pub async fn run(
             })
             .expect("Failed to set WAL mode");
 
+            // Explicitly retain the standard automatic checkpoint threshold.
+            conn.pragma_update(None, "wal_autocheckpoint", 1000)?;
+
             // Enable foreign keys.
             conn.execute("PRAGMA foreign_keys = ON", [])
                 .expect("Failed to enable foreign keys");
