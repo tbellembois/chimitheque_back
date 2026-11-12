@@ -591,6 +591,9 @@ pub async fn run(
 
     let manager = SqliteConnectionManager::file(db_path.clone())
         .with_init(|conn: &mut Connection| {
+            // Set busy_timeout FIRST so concurrent connection inits wait cleanly.
+            conn.busy_timeout(std::time::Duration::from_secs(10))?;
+
             // Load SQLite extensions directory.
             let sql_extension_dir = env::var("SQLITE_EXTENSION_DIR")
                 .expect("Missing SQLITE_EXTENSION_DIR environment variable.");
@@ -644,12 +647,6 @@ pub async fn run(
             conn.execute("PRAGMA temp_store = MEMORY", [])
                 .expect("Failed to set temp store to MEMORY");
 
-            // Vacuum and analyze.
-            conn.execute("VACUUM", [])
-                .expect("Failed to vacuum database");
-            conn.execute("ANALYZE", [])
-                .expect("Failed to analyze database");
-
             Ok(())
         })
         .with_flags(
@@ -661,6 +658,14 @@ pub async fn run(
 
     let db_connection_pool = r2d2::Pool::builder().max_size(20).build(manager).unwrap();
     let mut db_connection = db_connection_pool.get().unwrap();
+
+    // Run one-time startup maintenance on a single connection
+    {
+        db_connection
+            .execute_batch("PRAGMA optimize;")
+            .expect("Failed to analyze database");
+        // Only run VACUUM manually or during scheduled downtime, not on every boot.
+    }
 
     // Initialize database.
     create_tables(&mut db_connection).unwrap();

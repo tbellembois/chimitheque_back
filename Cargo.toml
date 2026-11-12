@@ -34,7 +34,8 @@ too_many_lines = "allow"
 [dependencies]
 axum = { version = "0.8.8", features = ["macros"]}
 axum-extra = { version = "0.12.3", features = ["query"] }
-casbin = { version = "2.20.0", default-features = false, features = ["runtime-async-std", "logging", "incremental"] }
+#casbin = { version = "2.20.0", default-features = false, features = ["runtime-async-std", "logging", "incremental"] }
+casbin = { git = "https://github.com/apache/casbin-rs", branch = "copilot/fix-db-connection-in-operator-function", default-features = false, features = ["runtime-async-std", "logging", "incremental"] }
 dashmap = { version = "6.1.0", default-features = false }
 dotenvy = { version = "0.15", default-features = false }
 erased-serde = { version = "0.3.31", default-features = false }
