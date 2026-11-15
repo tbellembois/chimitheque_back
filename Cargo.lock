@@ -444,8 +444,8 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "casbin"
-version = "2.17.0"
-source = "git+https://github.com/apache/casbin-rs?branch=copilot%2Ffix-db-connection-in-operator-function#a1b1d1ac5b1361cd08f5b18d025372e701ab21ba"
+version = "2.18.1"
+source = "git+https://github.com/apache/casbin-rs#614a35f0cadc7ba9cd6574d622c85fd15641d6ba"
 dependencies = [
  "async-std",
  "async-trait",
