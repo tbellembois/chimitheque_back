@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::{
-    AppState, axumrequestfilter::AxumRequestFilter, errors::AppError,
-    utils::get_chimitheque_person_id_from_headers,
+    AppState,
+    axumrequestfilter::AxumRequestFilter,
+    errors::AppError,
+    utils::{get_chimitheque_person_id_from_headers, get_unit_types},
 };
 
 pub async fn get_products(
@@ -125,6 +127,12 @@ pub async fn create_update_product(
     // Sanitize and validate the product.
     let mut product = product.clone();
     if let Err(err) = product.sanitize_and_validate() {
+        return Err(AppError::InputValidation(err.to_string()));
+    }
+
+    // Check the unit types against the database, not the request.
+    let unit_types = get_unit_types(&db_connection)?;
+    if let Err(err) = product.validate_unit_types(|unit_id| unit_types.get(&unit_id).copied()) {
         return Err(AppError::InputValidation(err.to_string()));
     }
 
