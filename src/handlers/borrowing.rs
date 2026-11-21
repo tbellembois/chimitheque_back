@@ -1,6 +1,7 @@
 use axum::extract::{Path, State};
 use axum_extra::extract::Query;
 use chimitheque_db::borrowing::toggle_storage_borrowing;
+use chimitheque_types::{borrowing::Borrowing, person::Person};
 use http::HeaderMap;
 use serde::Deserialize;
 
@@ -32,6 +33,22 @@ pub async fn toogle_borrowing(
         Err(err) => return Err(err),
     };
 
+    // Sanitize the borrowing: the comment is trimmed, and an empty comment
+    // is stored as NULL.
+    let mut borrowing = Borrowing {
+        borrowing_comment: Some(query_params.borrowing_comment),
+        person: chimitheque_person_id,
+        storage: path_params.id,
+        borrower: Person {
+            person_id: Some(query_params.borrower_id),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    if let Err(err) = borrowing.sanitize_and_validate() {
+        return Err(AppError::InputValidation(err.to_string()));
+    }
+
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
@@ -41,7 +58,7 @@ pub async fn toogle_borrowing(
         chimitheque_person_id,
         path_params.id,
         query_params.borrower_id,
-        Some(query_params.borrowing_comment),
+        borrowing.borrowing_comment,
     ) {
         Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
