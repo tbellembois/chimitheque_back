@@ -568,9 +568,10 @@ dependencies = [
 [[package]]
 name = "chimitheque_defines"
 version = "0.1.0"
-source = "git+https://github.com/tbellembois/chimitheque_defines.git?branch=main#3f0baad9d268544141e38ed555367f05cda44a64"
+source = "git+https://github.com/tbellembois/chimitheque_defines.git?branch=main#70a716632e1a3a8f03fed793046f4e29581612c5"
 dependencies = [
- "regex",
+ "lazy-regex",
+ "once_cell",
 ]
 
 [[package]]
@@ -1867,6 +1868,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0de8b303297635ad57c9f5059fd9cee7a47f8e8daa09df0fcd07dd39fb22977f"
 dependencies = [
  "log",
+]
+
+[[package]]
+name = "lazy-regex"
+version = "3.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0a2cce8a22920a29fdcc8c9170aa5d29edd9fbcf8bea856e24c2cb1c2419f67"
+dependencies = [
+ "lazy-regex-proc_macros",
+ "once_cell",
+ "regex",
+]
+
+[[package]]
+name = "lazy-regex-proc_macros"
+version = "3.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f1e4b1f1d8c71edb4ff2b2150ec4606445fd2ddf67ddc097655daf59286baa6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn 3.0.6",
 ]
 
 [[package]]
