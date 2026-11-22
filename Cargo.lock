@@ -510,6 +510,7 @@ dependencies = [
  "built",
  "casbin",
  "chimitheque_db",
+ "chimitheque_defines",
  "chimitheque_pubchem",
  "chimitheque_traits",
  "chimitheque_types",
@@ -566,7 +567,6 @@ dependencies = [
 [[package]]
 name = "chimitheque_defines"
 version = "0.1.0"
-source = "git+https://github.com/tbellembois/chimitheque_defines.git?branch=main#cd3beecadd4d97fe5db3c5c76a7233208df30fc1"
 dependencies = [
  "lazy-regex",
 ]

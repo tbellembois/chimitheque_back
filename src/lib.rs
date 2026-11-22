@@ -8,14 +8,12 @@ mod built_info {
 pub mod appstate;
 mod authorization;
 pub mod axumrequestfilter;
-pub mod constants;
 pub mod errors;
 pub mod handlers;
 pub mod utils;
 
 use crate::{
     appstate::{AppState, init_casbin_enforcer},
-    constants::{CHIMITHEQUE_PERSON_EMAIL_HEADER, CHIMITHEQUE_PERSON_ID_HEADER, REQUEST_ID_HEADER},
     errors::AppError,
     handlers::{
         bookmark::toogle_bookmark,
@@ -58,6 +56,9 @@ use crate::{
         version_info::get_version_info,
     },
     utils::get_chimitheque_person_id_from_headers,
+};
+use chimitheque_defines::{
+    CHIMITHEQUE_PERSON_EMAIL_HEADER, CHIMITHEQUE_PERSON_ID_HEADER, REQUEST_ID_HEADER,
 };
 
 use axum::{

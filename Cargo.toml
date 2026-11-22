@@ -67,6 +67,7 @@ chimitheque_traits = { git = "https://github.com/tbellembois/chimitheque_traits.
 chimitheque_utils = { git = "https://github.com/tbellembois/chimitheque_utils.git", branch = "main" }
 chimitheque_db = { git = "https://github.com/tbellembois/chimitheque_db.git", branch = "main" }
 chimitheque_pubchem = { git = "https://github.com/tbellembois/chimitheque_pubchem.git", branch = "main" }
+chimitheque_defines = { git = "https://github.com/tbellembois/chimitheque_defines.git", branch = "main" }
 
 [patch."https://github.com/tbellembois/chimitheque_types.git"]
 chimitheque_types = { path = "../chimitheque_types" }
@@ -82,6 +83,9 @@ chimitheque_db = { path = "../chimitheque_db" }
 
 [patch."https://github.com/tbellembois/chimitheque_pubchem.git"]
 chimitheque_pubchem = { path = "../chimitheque_pubchem" }
+
+[patch."https://github.com/tbellembois/chimitheque_defines.git"]
+chimitheque_defines = { path = "../chimitheque_defines" }
 
 [build-dependencies]
 built = { version = "0.7", features = ["chrono", "git2"] }

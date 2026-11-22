@@ -5,7 +5,9 @@ use chimitheque_types::{requestfilter::RequestFilter, unittype::UnitType};
 use http::HeaderMap;
 use rusqlite::Connection;
 
-use crate::{constants::CHIMITHEQUE_PERSON_ID_HEADER, errors::AppError};
+use chimitheque_defines::CHIMITHEQUE_PERSON_ID_HEADER;
+
+use crate::errors::AppError;
 
 /// Returns the type of every unit, by unit id, as stored in the database.
 ///
