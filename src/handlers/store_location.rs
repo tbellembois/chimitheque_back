@@ -161,6 +161,33 @@ pub async fn create_update_store_location(
         )?;
     }
 
+    // A store location stays in its entity, with a parent of the same entity.
+    let entity_id_of = |store_location_id| {
+        chimitheque_db::storelocation::store_location_entity_id(&db_connection, store_location_id)
+            .map_err(|err| AppError::Database(err.to_string()))
+    };
+    let stored_entity_id = match store_location.store_location_id {
+        Some(store_location_id) => entity_id_of(store_location_id)?,
+        None => None,
+    };
+    let parent_entity_id = match store_location
+        .store_location
+        .as_ref()
+        .and_then(|parent| parent.store_location_id)
+    {
+        Some(parent_id) => entity_id_of(parent_id)?,
+        None => None,
+    };
+    check_store_location_entity(
+        stored_entity_id,
+        store_location
+            .entity
+            .as_ref()
+            .and_then(|entity| entity.entity_id),
+        parent_entity_id,
+    )
+    .map_err(AppError::InputValidation)?;
+
     // A store location can not be moved inside itself.
     if let Some(store_location_id) = store_location.store_location_id
         && let Some(parent_id) = store_location
@@ -211,5 +238,61 @@ pub async fn delete_store_location(
     match chimitheque_db::storelocation::delete_store_location(&db_connection, id) {
         Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+/// Checks that a store location stays in its entity, and that its parent is in
+/// the same entity.
+///
+/// `stored_entity_id` is the entity of an updated store location, `entity_id`
+/// the one of the request (an update without one keeps its entity) and
+/// `parent_entity_id` the entity of the parent, if any.
+fn check_store_location_entity(
+    stored_entity_id: Option<u64>,
+    entity_id: Option<u64>,
+    parent_entity_id: Option<u64>,
+) -> Result<(), String> {
+    if let (Some(stored_entity_id), Some(entity_id)) = (stored_entity_id, entity_id)
+        && stored_entity_id != entity_id
+    {
+        return Err("a store location can not be moved to another entity".to_string());
+    }
+
+    if let (Some(entity_id), Some(parent_entity_id)) =
+        (entity_id.or(stored_entity_id), parent_entity_id)
+        && entity_id != parent_entity_id
+    {
+        return Err("the parent store location must be in the same entity".to_string());
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_check_store_location_entity() {
+        // A new store location, with or without a parent of its entity.
+        assert!(check_store_location_entity(None, Some(1), None).is_ok());
+        assert!(check_store_location_entity(None, Some(1), Some(1)).is_ok());
+        // An update keeping its entity, given or not.
+        assert!(check_store_location_entity(Some(1), Some(1), Some(1)).is_ok());
+        assert!(check_store_location_entity(Some(1), None, Some(1)).is_ok());
+
+        // Moved to another entity.
+        assert_eq!(
+            check_store_location_entity(Some(1), Some(2), None),
+            Err("a store location can not be moved to another entity".to_string())
+        );
+        // A parent of another entity: new, or updated with or without entity.
+        for (stored, entity) in [(None, Some(1)), (Some(1), Some(1)), (Some(1), None)] {
+            assert_eq!(
+                check_store_location_entity(stored, entity, Some(2)),
+                Err("the parent store location must be in the same entity".to_string()),
+                "{stored:?} {entity:?}"
+            );
+        }
     }
 }
