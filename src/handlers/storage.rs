@@ -163,6 +163,7 @@ pub async fn create_update_storage(
     if query_params.nb_items == 0 {
         query_params.nb_items = 1;
     }
+    check_nb_items(path_params.id > 0, query_params.nb_items)?;
 
     refuse_missing_references(
         &db_connection,
@@ -283,4 +284,29 @@ fn refuse_history(db_connection: &rusqlite::Connection, storage_id: u64) -> Resu
         chimitheque_db::storage::storage_is_history(db_connection, storage_id),
         "a storage history row can not be changed",
     )
+}
+
+/// Refuses several copies of an updated storage: an update writes one storage.
+fn check_nb_items(is_update: bool, nb_items: u64) -> Result<(), AppError> {
+    if is_update && nb_items > 1 {
+        return Err(AppError::InputValidation(
+            "nb_items must be 1 to update a storage".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_check_nb_items() {
+        assert!(check_nb_items(false, 5).is_ok());
+        assert!(check_nb_items(true, 1).is_ok());
+        assert!(matches!(
+            check_nb_items(true, 2),
+            Err(AppError::InputValidation(_))
+        ));
+    }
 }
