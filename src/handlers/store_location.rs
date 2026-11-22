@@ -127,6 +127,23 @@ pub async fn create_update_store_location(
         &chimitheque_db::storelocation::store_location_references(&store_location),
     )?;
 
+    // A store location can not be moved inside itself.
+    if let Some(store_location_id) = store_location.store_location_id
+        && let Some(parent_id) = store_location
+            .store_location
+            .as_ref()
+            .and_then(|parent| parent.store_location_id)
+    {
+        refuse_if(
+            chimitheque_db::storelocation::store_location_is_ancestor_of(
+                &db_connection,
+                store_location_id,
+                parent_id,
+            ),
+            "the parent store location is inside this store location",
+        )?;
+    }
+
     let mayerr_store_location_id = chimitheque_db::storelocation::create_update_store_location(
         &mut db_connection,
         store_location,
