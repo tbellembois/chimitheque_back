@@ -11,7 +11,7 @@ use tracing::info;
 use crate::{
     appstate::AppState,
     errors::AppError,
-    utils::{get_chimitheque_person_id_from_headers, get_unit_types},
+    utils::{get_chimitheque_person_id_from_headers, get_unit_types, refuse_missing_references},
 };
 
 pub async fn pubchem_autocomplete(
@@ -129,6 +129,11 @@ pub async fn pubchem_create_update_product(
     if let Err(err) = product.validate_unit_types(|unit_id| unit_types.get(&unit_id).copied()) {
         return Err(AppError::InputValidation(err.to_string()));
     }
+
+    refuse_missing_references(
+        &db_connection,
+        &chimitheque_db::product::product_references(&product),
+    )?;
 
     let mayerr_product_id =
         chimitheque_db::product::create_update_product(&mut db_connection, product);

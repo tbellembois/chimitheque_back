@@ -12,7 +12,7 @@ use crate::{
     appstate::init_casbin_enforcer,
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
-    utils::{get_chimitheque_person_id_from_headers, refuse_if},
+    utils::{get_chimitheque_person_id_from_headers, refuse_if, refuse_missing_references},
 };
 
 pub async fn get_entities(
@@ -125,6 +125,10 @@ pub async fn create_update_entity(
             entity.entity_id,
         ),
         "an entity with this name already exists",
+    )?;
+    refuse_missing_references(
+        &db_connection,
+        &chimitheque_db::entity::entity_references(&entity),
     )?;
 
     let mayerr_entity_id = chimitheque_db::entity::create_update_entity(&mut db_connection, entity);

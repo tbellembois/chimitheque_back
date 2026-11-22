@@ -1,11 +1,15 @@
 use axum::extract::{Path, State};
 use axum_extra::extract::Query;
-use chimitheque_db::borrowing::toggle_storage_borrowing;
+use chimitheque_db::{borrowing::toggle_storage_borrowing, reference::Reference};
 use chimitheque_types::{borrowing::Borrowing, person::Person};
 use http::HeaderMap;
 use serde::Deserialize;
 
-use crate::{appstate::AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
+use crate::{
+    appstate::AppState,
+    errors::AppError,
+    utils::{get_chimitheque_person_id_from_headers, refuse_missing_references},
+};
 
 #[derive(Deserialize)]
 pub struct ToogleBorrowingQueryParameters {
@@ -52,6 +56,14 @@ pub async fn toogle_borrowing(
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
+
+    refuse_missing_references(
+        &db_connection,
+        &[
+            Reference::new("storage", "storage", Some(path_params.id)),
+            Reference::new("borrower", "person", Some(query_params.borrower_id)),
+        ],
+    )?;
 
     match toggle_storage_borrowing(
         &mut db_connection,

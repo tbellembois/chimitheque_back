@@ -11,7 +11,10 @@ use crate::{
     AppState,
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
-    utils::{get_chimitheque_person_id_from_headers, get_unit_types, refuse_if},
+    utils::{
+        get_chimitheque_person_id_from_headers, get_unit_types, refuse_if,
+        refuse_missing_references,
+    },
 };
 
 pub async fn get_products(
@@ -146,6 +149,11 @@ pub async fn create_update_product(
     if path_params.id > 0 {
         product.product_id = Some(path_params.id);
     }
+
+    refuse_missing_references(
+        &db_connection,
+        &chimitheque_db::product::product_references(&product),
+    )?;
 
     let mayerr_product_id =
         chimitheque_db::product::create_update_product(&mut db_connection, product);

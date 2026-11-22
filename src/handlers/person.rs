@@ -12,7 +12,7 @@ use crate::{
     appstate::init_casbin_enforcer,
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
-    utils::{get_chimitheque_person_id_from_headers, refuse_if},
+    utils::{get_chimitheque_person_id_from_headers, refuse_if, refuse_missing_references},
 };
 
 pub async fn get_connected_user(
@@ -158,6 +158,10 @@ pub async fn create_update_person(
             person.person_id,
         ),
         "a person with this email already exists",
+    )?;
+    refuse_missing_references(
+        &db_connection,
+        &chimitheque_db::person::person_references(&person),
     )?;
 
     let mayerr_person_id = chimitheque_db::person::create_update_person(&mut db_connection, person);

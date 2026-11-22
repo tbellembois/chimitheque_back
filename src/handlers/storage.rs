@@ -12,7 +12,7 @@ use crate::{
     AppState,
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
-    utils::{get_chimitheque_person_id_from_headers, get_unit_types},
+    utils::{get_chimitheque_person_id_from_headers, get_unit_types, refuse_missing_references},
 };
 
 pub async fn get_storages(
@@ -158,6 +158,11 @@ pub async fn create_update_storage(
     if query_params.nb_items == 0 {
         query_params.nb_items = 1;
     }
+
+    refuse_missing_references(
+        &db_connection,
+        &chimitheque_db::storage::storage_references(&storage),
+    )?;
 
     let mayerr_storage_id = chimitheque_db::storage::create_update_storage(
         &mut db_connection,

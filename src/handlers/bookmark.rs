@@ -1,9 +1,13 @@
 use axum::extract::{Path, State};
-use chimitheque_db::bookmark::toggle_product_bookmark;
+use chimitheque_db::{bookmark::toggle_product_bookmark, reference::Reference};
 use http::HeaderMap;
 use serde::Deserialize;
 
-use crate::{appstate::AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
+use crate::{
+    appstate::AppState,
+    errors::AppError,
+    utils::{get_chimitheque_person_id_from_headers, refuse_missing_references},
+};
 
 #[derive(Deserialize)]
 pub struct ToogleBookmarkPathParameters {
@@ -25,6 +29,11 @@ pub async fn toogle_bookmark(
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
+
+    refuse_missing_references(
+        &db_connection,
+        &[Reference::new("product", "product", Some(path_params.id))],
+    )?;
 
     match toggle_product_bookmark(&mut db_connection, chimitheque_person_id, path_params.id) {
         Ok(()) => Ok(()),

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use chimitheque_db::reference::{Reference, find_missing_reference};
 use chimitheque_types::{requestfilter::RequestFilter, unittype::UnitType};
 use http::HeaderMap;
 use rusqlite::Connection;
@@ -32,6 +33,19 @@ pub(crate) fn refuse_if(
     match check {
         Ok(true) => Err(AppError::InputValidation(message.to_string())),
         Ok(false) => Ok(()),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
+/// Refuses a request that refers to an id the database does not have: returns
+/// `AppError::InputValidation` naming the first missing reference.
+pub(crate) fn refuse_missing_references(
+    db_connection: &Connection,
+    references: &[Reference],
+) -> Result<(), AppError> {
+    match find_missing_reference(db_connection, references) {
+        Ok(None) => Ok(()),
+        Ok(Some(message)) => Err(AppError::InputValidation(message)),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
 }
@@ -89,6 +103,26 @@ mod tests {
         assert!(matches!(
             refuse_if(Err("no such table".into()), "refused"),
             Err(AppError::Database(_))
+        ));
+    }
+
+    #[test]
+    fn test_refuse_missing_references() {
+        unsafe {
+            std::env::set_var("SQLITE_EXTENSION_DIR", "src/extensions");
+        };
+        let mut db_connection = chimitheque_db::init::connect_test();
+        chimitheque_db::init::create_tables(&mut db_connection).unwrap();
+        chimitheque_db::init::populate_db_with_base_data(&mut db_connection).unwrap();
+
+        // Unit 1 is a base unit, unit 999 does not exist.
+        assert!(
+            refuse_missing_references(&db_connection, &[Reference::new("unit", "unit", Some(1))])
+                .is_ok()
+        );
+        assert!(matches!(
+            refuse_missing_references(&db_connection, &[Reference::new("unit", "unit", Some(999))]),
+            Err(AppError::InputValidation(message)) if message == "unknown unit id 999"
         ));
     }
 }

@@ -11,7 +11,7 @@ use crate::{
     AppState,
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
-    utils::{get_chimitheque_person_id_from_headers, refuse_if},
+    utils::{get_chimitheque_person_id_from_headers, refuse_if, refuse_missing_references},
 };
 
 pub async fn get_store_locations(
@@ -111,16 +111,21 @@ pub async fn create_update_store_location(
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
 
-    // Sanitize and validate the store location..
+    // update? Set before validating: a store location can not be its own parent.
     let mut store_location = store_location.clone();
+    if path_params.id > 0 {
+        store_location.store_location_id = Some(path_params.id);
+    }
+
+    // Sanitize and validate the store location.
     if let Err(err) = store_location.sanitize_and_validate() {
         return Err(AppError::InputValidation(err.to_string()));
     }
 
-    // update?
-    if path_params.id > 0 {
-        store_location.store_location_id = Some(path_params.id);
-    }
+    refuse_missing_references(
+        &db_connection,
+        &chimitheque_db::storelocation::store_location_references(&store_location),
+    )?;
 
     let mayerr_store_location_id = chimitheque_db::storelocation::create_update_store_location(
         &mut db_connection,
