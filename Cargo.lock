@@ -566,7 +566,7 @@ dependencies = [
 [[package]]
 name = "chimitheque_defines"
 version = "0.1.0"
-source = "git+https://github.com/tbellembois/chimitheque_defines.git?branch=main#e6e72c0f7251e2c76abb60ce6a75329fe913b6a6"
+source = "git+https://github.com/tbellembois/chimitheque_defines.git?branch=main#d79578d92c147233eb501e0911f0826a3420bceb"
 dependencies = [
  "lazy-regex",
 ]
