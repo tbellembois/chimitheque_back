@@ -170,7 +170,7 @@ pub async fn create_update_person(
         &chimitheque_db::person::person_references(&person),
     )?;
 
-    // Managers and permissions the requester may not change.
+    // Managers, permissions and memberships the requester may not change.
     let requester = get_requester(&db_connection, chimitheque_person_id)?;
     let stored = match person.person_id {
         Some(person_id) => StoredPerson {
@@ -181,6 +181,8 @@ pub async fn create_update_person(
                 person_id,
             )
             .map_err(|err| AppError::Database(err.to_string()))?,
+            member_entity_ids: chimitheque_db::person::member_entity_ids(&db_connection, person_id)
+                .map_err(|err| AppError::Database(err.to_string()))?,
         },
         None => StoredPerson::default(),
     };

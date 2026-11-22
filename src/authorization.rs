@@ -16,6 +16,8 @@ pub(crate) struct StoredPerson {
     pub permissions: Vec<Permission>,
     /// The ids of the entities the person manages.
     pub managed_entity_ids: Vec<u64>,
+    /// The ids of the entities the person is a member of.
+    pub member_entity_ids: Vec<u64>,
 }
 
 /// The person who sends the request.
@@ -36,6 +38,8 @@ type Grant = (PermissionName, PermissionItem, Option<u64>);
 ///   change them.
 /// - A manager has fixed permissions: they can not be changed.
 /// - A non-admin can only change permissions on the entities they manage.
+/// - A non-admin can only add people to, or remove them from, the entities they
+///   manage.
 ///
 /// Permissions derived by the save are ignored: reading products, reading the
 /// entities of the person, and the permissions of their managed entities.
@@ -86,6 +90,30 @@ pub(crate) fn check_person_save(
         if !same_grants(&fixed_grants, &stored_fixed_grants) {
             return Err(
                 "only an admin can change permissions on all entities or on entities you do not manage"
+                    .to_string(),
+            );
+        }
+
+        // Memberships of the entities the requester does not manage.
+        let unmanaged = |entity_ids: Vec<u64>| -> Vec<u64> {
+            let mut entity_ids: Vec<u64> = entity_ids
+                .into_iter()
+                .filter(|entity_id| !requester.managed_entity_ids.contains(entity_id))
+                .collect();
+            entity_ids.sort_unstable();
+            entity_ids.dedup();
+            entity_ids
+        };
+        let member_entity_ids: Vec<u64> = person
+            .entities
+            .iter()
+            .flatten()
+            .filter_map(|entity| entity.entity_id)
+            .collect();
+
+        if unmanaged(member_entity_ids) != unmanaged(stored.member_entity_ids.clone()) {
+            return Err(
+                "only an admin can add people to, or remove them from, entities you do not manage"
                     .to_string(),
             );
         }
@@ -271,6 +299,7 @@ mod tests {
                 storages_3.clone(),
             ],
             managed_entity_ids: vec![2],
+            ..Default::default()
         };
 
         // Unchanged, the derived permissions sent or not.
@@ -353,6 +382,33 @@ mod tests {
             check_person_save(&manager(), &stored, &person(vec![others[0].clone()], None)).is_err()
         );
         assert!(check_person_save(&manager(), &stored, &person(vec![], None)).is_err());
+    }
+
+    #[test]
+    fn test_non_admin_memberships_of_managed_entities_only() {
+        let with_entities = |entity_ids: &[u64]| Person {
+            entities: Some(entities(entity_ids)),
+            ..Default::default()
+        };
+        // A member of entities 1 and 2.
+        let stored = StoredPerson {
+            member_entity_ids: vec![1, 2],
+            ..Default::default()
+        };
+
+        // Added to or removed from the managed entity 1.
+        assert!(check_person_save(&manager(), &stored, &with_entities(&[2])).is_ok());
+        assert!(
+            check_person_save(&manager(), &StoredPerson::default(), &with_entities(&[1])).is_ok()
+        );
+
+        // Added to or removed from entity 3 or 2.
+        assert!(check_person_save(&manager(), &stored, &with_entities(&[1, 2, 3])).is_err());
+        assert!(check_person_save(&manager(), &stored, &with_entities(&[1])).is_err());
+        assert!(check_person_save(&manager(), &stored, &Person::default()).is_err());
+
+        // An admin can.
+        assert!(check_person_save(&admin(), &stored, &with_entities(&[3])).is_ok());
     }
 
     #[test]
