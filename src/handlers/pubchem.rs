@@ -1,13 +1,18 @@
 use axum::extract::Path;
 use axum::{Json, extract::State};
+use chimitheque_db::pubchemproduct::{ImportPubchemProductError, resolve_pick_lists};
 use chimitheque_pubchem::pubchem::autocomplete;
 use chimitheque_pubchem::pubchem::get_product_by_name;
-use chimitheque_types::pubchemproduct::PubchemProduct;
+use chimitheque_types::{person::Person, pubchemproduct::PubchemProduct};
 use http::{HeaderMap, HeaderValue};
 use serde::Deserialize;
 use tracing::info;
 
-use crate::{appstate::AppState, errors::AppError, utils::get_chimitheque_person_id_from_headers};
+use crate::{
+    appstate::AppState,
+    errors::AppError,
+    utils::{get_chimitheque_person_id_from_headers, get_unit_types},
+};
 
 pub async fn pubchem_autocomplete(
     State(state): State<AppState>,
@@ -92,17 +97,41 @@ pub async fn pubchem_create_update_product(
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
 
-    let mut product_id: Option<u64> = None;
-    if path_params.id > 0 {
-        product_id = Some(path_params.id);
+    // Convert the PubChem product into a product and resolve its pick-list
+    // fields (symbols, statements, signal word, unit) from the database.
+    let mut product = pubchem_product
+        .to_product()
+        .map_err(|err| AppError::InputValidation(err.to_string()))?;
+    if let Err(err) = resolve_pick_lists(&db_connection, &mut product) {
+        return Err(if err.is::<ImportPubchemProductError>() {
+            AppError::InputValidation(err.to_string())
+        } else {
+            AppError::Database(err.to_string())
+        });
     }
 
-    let mayerr_product_id = chimitheque_db::pubchemproduct::create_update_product_from_pubchem(
-        &mut db_connection,
-        pubchem_product,
-        chimitheque_person_id,
-        product_id,
-    );
+    // Set product person.
+    product.person = Person {
+        person_id: Some(chimitheque_person_id),
+        ..Default::default()
+    };
+
+    // update? The imported data replaces the product.
+    if path_params.id > 0 {
+        product.product_id = Some(path_params.id);
+    }
+
+    // Then validate and save it like any other product.
+    if let Err(err) = product.sanitize_and_validate() {
+        return Err(AppError::InputValidation(err.to_string()));
+    }
+    let unit_types = get_unit_types(&db_connection)?;
+    if let Err(err) = product.validate_unit_types(|unit_id| unit_types.get(&unit_id).copied()) {
+        return Err(AppError::InputValidation(err.to_string()));
+    }
+
+    let mayerr_product_id =
+        chimitheque_db::product::create_update_product(&mut db_connection, product);
 
     match mayerr_product_id {
         Ok(product_id) => Ok(Json(product_id)),
