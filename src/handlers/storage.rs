@@ -13,7 +13,10 @@ use crate::{
     authorization::refuse_unless_can_write_in_store_location_entity,
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
-    utils::{get_chimitheque_person_id_from_headers, get_unit_types, refuse_missing_references},
+    utils::{
+        get_chimitheque_person_id_from_headers, get_unit_types, refuse_if,
+        refuse_missing_references,
+    },
 };
 
 pub async fn get_storages(
@@ -153,6 +156,7 @@ pub async fn create_update_storage(
     // update?
     if path_params.id > 0 {
         storage.storage_id = Some(path_params.id);
+        refuse_history(&db_connection, path_params.id)?;
     }
 
     // Ensure nb_items not zero.
@@ -197,6 +201,8 @@ pub async fn delete_storage(
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
+
+    refuse_history(&db_connection, id)?;
 
     match chimitheque_db::storage::delete_storage(&mut db_connection, id) {
         Ok(()) => Ok(()),
@@ -245,6 +251,8 @@ pub async fn archive_storage(
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
 
+    refuse_history(&db_connection, id)?;
+
     match chimitheque_db::storage::archive_storage(&mut db_connection, id) {
         Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -261,8 +269,18 @@ pub async fn unarchive_storage(
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
 
+    refuse_history(&db_connection, id)?;
+
     match chimitheque_db::storage::unarchive_storage(&mut db_connection, id) {
         Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
+}
+
+/// Refuses a change of a history row: an earlier version of a storage.
+fn refuse_history(db_connection: &rusqlite::Connection, storage_id: u64) -> Result<(), AppError> {
+    refuse_if(
+        chimitheque_db::storage::storage_is_history(db_connection, storage_id),
+        "a storage history row can not be changed",
+    )
 }
