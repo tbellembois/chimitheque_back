@@ -11,7 +11,7 @@ use crate::{
     AppState,
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
-    utils::{get_chimitheque_person_id_from_headers, get_unit_types},
+    utils::{get_chimitheque_person_id_from_headers, get_unit_types, refuse_if},
 };
 
 pub async fn get_products(
@@ -165,6 +165,11 @@ pub async fn delete_product(
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
+
+    refuse_if(
+        chimitheque_db::product::product_has_storages(&db_connection, id),
+        "the product still has storages",
+    )?;
 
     match chimitheque_db::product::delete_product(&mut db_connection, id) {
         Ok(()) => Ok(()),

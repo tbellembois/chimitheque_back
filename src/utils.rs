@@ -22,6 +22,20 @@ pub(crate) fn get_unit_types(
         .collect())
 }
 
+/// Refuses a request the database would reject: returns
+/// `AppError::InputValidation(message)` when `check` is true, or
+/// `AppError::Database` when the check itself failed.
+pub(crate) fn refuse_if(
+    check: Result<bool, Box<dyn std::error::Error + Send + Sync>>,
+    message: &str,
+) -> Result<(), AppError> {
+    match check {
+        Ok(true) => Err(AppError::InputValidation(message.to_string())),
+        Ok(false) => Ok(()),
+        Err(err) => Err(AppError::Database(err.to_string())),
+    }
+}
+
 pub(crate) fn get_chimitheque_person_id_from_headers(headers: &HeaderMap) -> Result<u64, AppError> {
     let Some(chimitheque_person_id_header) = headers.get(CHIMITHEQUE_PERSON_ID_HEADER) else {
         return Err(AppError::ChimithequePersonIdHeaderMissing);
@@ -63,5 +77,18 @@ mod tests {
         assert_eq!(unit_types.get(&14), Some(&UnitType::Temperature));
         assert_eq!(unit_types.get(&21), Some(&UnitType::Concentration));
         assert_eq!(unit_types.get(&24), Some(&UnitType::MolecularWeight));
+    }
+
+    #[test]
+    fn test_refuse_if() {
+        assert!(refuse_if(Ok(false), "refused").is_ok());
+        assert!(matches!(
+            refuse_if(Ok(true), "refused"),
+            Err(AppError::InputValidation(message)) if message == "refused"
+        ));
+        assert!(matches!(
+            refuse_if(Err("no such table".into()), "refused"),
+            Err(AppError::Database(_))
+        ));
     }
 }

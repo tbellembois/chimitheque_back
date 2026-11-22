@@ -26,11 +26,7 @@ pub async fn toogle_bookmark(
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
 
-    match toggle_product_bookmark(
-        &mut db_connection,
-        chimitheque_person_id,
-        path_params.id,
-    ) {
+    match toggle_product_bookmark(&mut db_connection, chimitheque_person_id, path_params.id) {
         Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
     }

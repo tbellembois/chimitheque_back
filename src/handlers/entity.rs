@@ -8,8 +8,11 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::{
-    AppState, appstate::init_casbin_enforcer, axumrequestfilter::AxumRequestFilter,
-    errors::AppError, utils::get_chimitheque_person_id_from_headers,
+    AppState,
+    appstate::init_casbin_enforcer,
+    axumrequestfilter::AxumRequestFilter,
+    errors::AppError,
+    utils::{get_chimitheque_person_id_from_headers, refuse_if},
 };
 
 pub async fn get_entities(
@@ -115,6 +118,15 @@ pub async fn create_update_entity(
         entity.entity_id = Some(path_params.id);
     }
 
+    refuse_if(
+        chimitheque_db::entity::entity_name_exists(
+            &db_connection,
+            &entity.entity_name,
+            entity.entity_id,
+        ),
+        "an entity with this name already exists",
+    )?;
+
     let mayerr_entity_id = chimitheque_db::entity::create_update_entity(&mut db_connection, entity);
 
     init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
@@ -134,6 +146,15 @@ pub async fn delete_entity(
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
+
+    refuse_if(
+        chimitheque_db::entity::entity_has_members(&db_connection, id),
+        "the entity still has members",
+    )?;
+    refuse_if(
+        chimitheque_db::entity::entity_has_store_locations(&db_connection, id),
+        "the entity still has store locations",
+    )?;
 
     init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
 

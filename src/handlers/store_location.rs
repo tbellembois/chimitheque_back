@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::{
-    AppState, axumrequestfilter::AxumRequestFilter, errors::AppError,
-    utils::get_chimitheque_person_id_from_headers,
+    AppState,
+    axumrequestfilter::AxumRequestFilter,
+    errors::AppError,
+    utils::{get_chimitheque_person_id_from_headers, refuse_if},
 };
 
 pub async fn get_store_locations(
@@ -140,6 +142,15 @@ pub async fn delete_store_location(
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let db_connection = db_connection_pool.get().unwrap();
+
+    refuse_if(
+        chimitheque_db::storelocation::store_location_has_storages(&db_connection, id),
+        "the store location still has storages",
+    )?;
+    refuse_if(
+        chimitheque_db::storelocation::store_location_has_children(&db_connection, id),
+        "the store location still has child store locations",
+    )?;
 
     match chimitheque_db::storelocation::delete_store_location(&db_connection, id) {
         Ok(()) => Ok(()),

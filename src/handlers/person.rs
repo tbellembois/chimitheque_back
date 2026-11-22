@@ -8,8 +8,11 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::{
-    AppState, appstate::init_casbin_enforcer, axumrequestfilter::AxumRequestFilter,
-    errors::AppError, utils::get_chimitheque_person_id_from_headers,
+    AppState,
+    appstate::init_casbin_enforcer,
+    axumrequestfilter::AxumRequestFilter,
+    errors::AppError,
+    utils::{get_chimitheque_person_id_from_headers, refuse_if},
 };
 
 pub async fn get_connected_user(
@@ -148,6 +151,15 @@ pub async fn create_update_person(
         person.person_id = Some(path_params.id);
     }
 
+    refuse_if(
+        chimitheque_db::person::person_email_exists(
+            &db_connection,
+            &person.person_email,
+            person.person_id,
+        ),
+        "a person with this email already exists",
+    )?;
+
     let mayerr_person_id = chimitheque_db::person::create_update_person(&mut db_connection, person);
 
     init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
@@ -163,6 +175,14 @@ pub async fn delete_person(
     Path(id): Path<u64>,
 ) -> Result<(), AppError> {
     info!("delete_person: {}", id);
+
+    // Products and storages of a deleted person are given to the admin
+    // (person 1), so the admin can not be deleted.
+    if id == 1 {
+        return Err(AppError::InputValidation(
+            "the Chimithèque admin can not be deleted".to_string(),
+        ));
+    }
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
