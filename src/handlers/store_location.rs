@@ -3,12 +3,15 @@ use axum::{
     extract::{Path, State},
     http::HeaderMap,
 };
-use chimitheque_types::storelocation::StoreLocation;
+use chimitheque_types::{permission::PermissionItem, storelocation::StoreLocation};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::{
     AppState,
+    authorization::{
+        refuse_unless_can_write_in_entity, refuse_unless_can_write_in_store_location_entity,
+    },
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
     utils::{get_chimitheque_person_id_from_headers, refuse_if, refuse_missing_references},
@@ -102,10 +105,14 @@ pub struct CreateUpdateStoreLocationPathParameters {
 
 pub async fn create_update_store_location(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(path_params): Path<CreateUpdateStoreLocationPathParameters>,
     Json(store_location): Json<StoreLocation>,
 ) -> Result<Json<u64>, AppError> {
     info!("create_update_store_location: {}", store_location);
+
+    // Get the chimitheque_person_id.
+    let chimitheque_person_id = get_chimitheque_person_id_from_headers(&headers)?;
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -126,6 +133,33 @@ pub async fn create_update_store_location(
         &db_connection,
         &chimitheque_db::storelocation::store_location_references(&store_location),
     )?;
+
+    // The store location is written in its entity, under a parent of an
+    // entity the person can write too.
+    if let Some(entity_id) = store_location
+        .entity
+        .as_ref()
+        .and_then(|entity| entity.entity_id)
+    {
+        refuse_unless_can_write_in_entity(
+            &db_connection,
+            chimitheque_person_id,
+            &PermissionItem::Entities,
+            entity_id,
+        )?;
+    }
+    if let Some(parent_id) = store_location
+        .store_location
+        .as_ref()
+        .and_then(|parent| parent.store_location_id)
+    {
+        refuse_unless_can_write_in_store_location_entity(
+            &db_connection,
+            chimitheque_person_id,
+            &PermissionItem::Entities,
+            parent_id,
+        )?;
+    }
 
     // A store location can not be moved inside itself.
     if let Some(store_location_id) = store_location.store_location_id

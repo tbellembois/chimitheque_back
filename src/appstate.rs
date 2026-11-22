@@ -16,11 +16,28 @@ use governor::{
 };
 use r2d2::{self, Pool};
 use r2d2_sqlite::SqliteConnectionManager;
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use tokio::sync::Mutex;
 use tracing::error;
 
 use crate::errors::AppError;
+
+/// Set when a casbin matcher function fails during an enforce call.
+///
+/// A failed matcher returns `false`, which a negated condition of the policy,
+/// e.g. `!matchPersonIsAdmin(...)`, would turn into an allow: the authorize
+/// middleware clears it before enforcing and denies the request when it is set.
+/// Enforce calls are serialized by the enforcer lock.
+pub(crate) static MATCHER_FAILED: AtomicBool = AtomicBool::new(false);
+
+/// Records a failed matcher and returns `false`.
+fn matcher_failed() -> bool {
+    MATCHER_FAILED.store(true, Ordering::SeqCst);
+    false
+}
 
 #[derive(Clone)]
 pub struct AppState {
@@ -74,7 +91,7 @@ pub async fn init_casbin_enforcer(
                     Ok(product_id) => product_id,
                     Err(err) => {
                         error!("failed to parse product ID to u64: {} {}", product_id, err);
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 },
                 Err(err) => {
@@ -82,7 +99,7 @@ pub async fn init_casbin_enforcer(
                         "failed to convert product ID into string: {} {}",
                         product_id, err
                     );
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -90,7 +107,7 @@ pub async fn init_casbin_enforcer(
                 Ok(db_connection) => db_connection,
                 Err(err) => {
                     error!("failed to get database connection pool: {}", err);
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -98,7 +115,7 @@ pub async fn init_casbin_enforcer(
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match product has storages: {}", err);
-                    false
+                    matcher_failed()
                 }
             };
 
@@ -118,7 +135,7 @@ pub async fn init_casbin_enforcer(
                                 "failed to parse store location ID to u64: {} {}",
                                 store_location_id, err
                             );
-                            return false.into();
+                            return matcher_failed().into();
                         }
                     },
                     Err(err) => {
@@ -126,7 +143,7 @@ pub async fn init_casbin_enforcer(
                             "failed to convert store location ID into string: {} {}",
                             store_location_id, err
                         );
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 };
 
@@ -135,7 +152,7 @@ pub async fn init_casbin_enforcer(
                         Ok(entity_id) => entity_id,
                         Err(err) => {
                             error!("failed to parse entity ID to u64: {} {}", entity_id, err);
-                            return false.into();
+                            return matcher_failed().into();
                         }
                     },
                     Err(err) => {
@@ -143,7 +160,7 @@ pub async fn init_casbin_enforcer(
                             "failed to convert entity ID into string: {} {}",
                             entity_id, err
                         );
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 };
 
@@ -151,7 +168,7 @@ pub async fn init_casbin_enforcer(
                     Ok(db_connection) => db_connection,
                     Err(err) => {
                         error!("failed to get database connection pool: {}", err);
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 };
 
@@ -163,7 +180,7 @@ pub async fn init_casbin_enforcer(
                     Ok(result) => result,
                     Err(err) => {
                         error!("failed to match store location is in entity: {}", err);
-                        false
+                        matcher_failed()
                     }
                 };
 
@@ -180,7 +197,7 @@ pub async fn init_casbin_enforcer(
                     Ok(storage_id) => storage_id,
                     Err(err) => {
                         error!("failed to parse storage ID to u64: {} {}", storage_id, err);
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 },
                 Err(err) => {
@@ -188,7 +205,7 @@ pub async fn init_casbin_enforcer(
                         "failed to convert storage ID into string: {} {}",
                         storage_id, err
                     );
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -197,7 +214,7 @@ pub async fn init_casbin_enforcer(
                     Ok(entity_id) => entity_id,
                     Err(err) => {
                         error!("failed to parse entity ID to u64: {} {}", entity_id, err);
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 },
                 Err(err) => {
@@ -205,7 +222,7 @@ pub async fn init_casbin_enforcer(
                         "failed to convert entity ID into string: {} {}",
                         entity_id, err
                     );
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -213,7 +230,7 @@ pub async fn init_casbin_enforcer(
                 Ok(db_connection) => db_connection,
                 Err(err) => {
                     error!("failed to get database connection pool: {}", err);
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -221,7 +238,7 @@ pub async fn init_casbin_enforcer(
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match storage is in entity: {}", err);
-                    false
+                    matcher_failed()
                 }
             };
 
@@ -240,7 +257,7 @@ pub async fn init_casbin_enforcer(
                             "failed to parse store location ID to u64: {} {}",
                             store_location_id, err
                         );
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 },
                 Err(err) => {
@@ -248,7 +265,7 @@ pub async fn init_casbin_enforcer(
                         "failed to convert store location ID into string: {} {}",
                         store_location_id, err
                     );
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -256,7 +273,7 @@ pub async fn init_casbin_enforcer(
                 Ok(db_connection) => db_connection,
                 Err(err) => {
                     error!("failed to get database connection pool: {}", err);
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -265,7 +282,7 @@ pub async fn init_casbin_enforcer(
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match store location has children: {}", err);
-                    false
+                    matcher_failed()
                 }
             };
 
@@ -284,7 +301,7 @@ pub async fn init_casbin_enforcer(
                             "failed to parse store location ID to u64: {} {}",
                             store_location_id, err
                         );
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 },
                 Err(err) => {
@@ -292,7 +309,7 @@ pub async fn init_casbin_enforcer(
                         "failed to convert store location ID into string: {} {}",
                         store_location_id, err
                     );
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -300,7 +317,7 @@ pub async fn init_casbin_enforcer(
                 Ok(db_connection) => db_connection,
                 Err(err) => {
                     error!("failed to get database connection pool: {}", err);
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -309,7 +326,7 @@ pub async fn init_casbin_enforcer(
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match store location has storages: {}", err);
-                    false
+                    matcher_failed()
                 }
             };
 
@@ -325,7 +342,7 @@ pub async fn init_casbin_enforcer(
                     Ok(person_id) => person_id,
                     Err(err) => {
                         error!("failed to parse person ID to u64: {} {}", entity_id, err);
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 },
                 Err(err) => {
@@ -333,7 +350,7 @@ pub async fn init_casbin_enforcer(
                         "failed to convert person ID into string: {} {}",
                         person_id, err
                     );
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -342,7 +359,7 @@ pub async fn init_casbin_enforcer(
                     Ok(entity_id) => entity_id,
                     Err(err) => {
                         error!("failed to parse entity ID to u64: {} {}", entity_id, err);
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 },
                 Err(err) => {
@@ -350,7 +367,7 @@ pub async fn init_casbin_enforcer(
                         "failed to convert entity ID into string: {} {}",
                         entity_id, err
                     );
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -358,7 +375,7 @@ pub async fn init_casbin_enforcer(
                 Ok(db_connection) => db_connection,
                 Err(err) => {
                     error!("failed to get database connection pool: {}", err);
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -366,7 +383,7 @@ pub async fn init_casbin_enforcer(
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match person is in entity: {}", err);
-                    false
+                    matcher_failed()
                 }
             };
 
@@ -382,7 +399,7 @@ pub async fn init_casbin_enforcer(
                     Ok(person_id) => person_id,
                     Err(err) => {
                         error!("failed to parse person ID to u64: {} {}", person_id, err);
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 },
                 Err(err) => {
@@ -390,7 +407,7 @@ pub async fn init_casbin_enforcer(
                         "failed to convert person ID into string: {} {}",
                         person_id, err
                     );
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -398,7 +415,7 @@ pub async fn init_casbin_enforcer(
                 Ok(db_connection) => db_connection,
                 Err(err) => {
                     error!("failed to get database connection pool: {}", err);
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -406,7 +423,7 @@ pub async fn init_casbin_enforcer(
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match person is admin: {}", err);
-                    false
+                    matcher_failed()
                 }
             };
 
@@ -422,7 +439,7 @@ pub async fn init_casbin_enforcer(
                     Ok(person_id) => person_id,
                     Err(err) => {
                         error!("failed to parse person ID to u64: {} {}", person_id, err);
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 },
                 Err(err) => {
@@ -430,7 +447,7 @@ pub async fn init_casbin_enforcer(
                         "failed to convert person ID into string: {} {}",
                         person_id, err
                     );
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -438,7 +455,7 @@ pub async fn init_casbin_enforcer(
                 Ok(db_connection) => db_connection,
                 Err(err) => {
                     error!("failed to get database connection pool: {}", err);
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -446,7 +463,7 @@ pub async fn init_casbin_enforcer(
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match person is manager: {}", err);
-                    false
+                    matcher_failed()
                 }
             };
 
@@ -462,7 +479,7 @@ pub async fn init_casbin_enforcer(
                     Ok(entity_id) => entity_id,
                     Err(err) => {
                         error!("failed to parse entity ID to u64: {} {}", entity_id, err);
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 },
                 Err(err) => {
@@ -470,7 +487,7 @@ pub async fn init_casbin_enforcer(
                         "failed to convert entity ID into string: {} {}",
                         entity_id, err
                     );
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -478,7 +495,7 @@ pub async fn init_casbin_enforcer(
                 Ok(db_connection) => db_connection,
                 Err(err) => {
                     error!("failed to get database connection pool: {}", err);
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -486,7 +503,7 @@ pub async fn init_casbin_enforcer(
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match entity has members: {}", err);
-                    false
+                    matcher_failed()
                 }
             };
 
@@ -502,7 +519,7 @@ pub async fn init_casbin_enforcer(
                     Ok(entity_id) => entity_id,
                     Err(err) => {
                         error!("failed to parse entity ID to u64: {} {}", entity_id, err);
-                        return false.into();
+                        return matcher_failed().into();
                     }
                 },
                 Err(err) => {
@@ -510,7 +527,7 @@ pub async fn init_casbin_enforcer(
                         "failed to convert entity ID into string: {} {}",
                         entity_id, err
                     );
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -518,7 +535,7 @@ pub async fn init_casbin_enforcer(
                 Ok(db_connection) => db_connection,
                 Err(err) => {
                     error!("failed to get database connection pool: {}", err);
-                    return false.into();
+                    return matcher_failed().into();
                 }
             };
 
@@ -526,7 +543,7 @@ pub async fn init_casbin_enforcer(
                 Ok(result) => result,
                 Err(err) => {
                     error!("failed to match entity has store locations: {}", err);
-                    false
+                    matcher_failed()
                 }
             };
 

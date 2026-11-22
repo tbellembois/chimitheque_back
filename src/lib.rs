@@ -6,6 +6,7 @@ mod built_info {
 }
 
 pub mod appstate;
+mod authorization;
 pub mod axumrequestfilter;
 pub mod constants;
 pub mod errors;
@@ -484,12 +485,23 @@ async fn authorize_middleware(
 
         let _enter = decision_span.enter();
 
-        match casbin_enforcer.enforce((
+        appstate::MATCHER_FAILED.store(false, std::sync::atomic::Ordering::SeqCst);
+        let decision = casbin_enforcer.enforce((
             chimitheque_person_id.to_string(),
             request_action,
             item,
             item_id,
-        )) {
+        ));
+
+        // A failed matcher function, e.g. on an unknown id, must deny, even when
+        // negated in the policy. The failure is logged by the matcher.
+        if appstate::MATCHER_FAILED.load(std::sync::atomic::Ordering::SeqCst) {
+            decision_span.record("decision", "deny");
+            debug!("casbin deny: a matcher function failed");
+            return AppError::PermissionDenied.into_response();
+        }
+
+        match decision {
             Ok(true) => {
                 decision_span.record("decision", "allow");
                 debug!("casbin allow");

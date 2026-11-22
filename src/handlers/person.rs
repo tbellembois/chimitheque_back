@@ -4,12 +4,14 @@ use axum::{
     http::HeaderMap,
 };
 use chimitheque_types::{person::Person, requestfilter::RequestFilter};
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::{
     AppState,
     appstate::init_casbin_enforcer,
+    authorization::{Requester, StoredPerson, check_person_save},
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
     utils::{get_chimitheque_person_id_from_headers, refuse_if, refuse_missing_references},
@@ -131,10 +133,14 @@ pub struct CreateUpdatePersonPathParameters {
 
 pub async fn create_update_person(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(path_params): Path<CreateUpdatePersonPathParameters>,
     Json(person): Json<Person>,
 ) -> Result<Json<u64>, AppError> {
     info!("create_update_person: {}", person);
+
+    // Get the chimitheque_person_id.
+    let chimitheque_person_id = get_chimitheque_person_id_from_headers(&headers)?;
 
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
@@ -163,6 +169,22 @@ pub async fn create_update_person(
         &db_connection,
         &chimitheque_db::person::person_references(&person),
     )?;
+
+    // Managers and permissions the requester may not change.
+    let requester = get_requester(&db_connection, chimitheque_person_id)?;
+    let stored = match person.person_id {
+        Some(person_id) => StoredPerson {
+            permissions: chimitheque_db::person::person_permissions(&db_connection, person_id)
+                .map_err(|err| AppError::Database(err.to_string()))?,
+            managed_entity_ids: chimitheque_db::person::managed_entity_ids(
+                &db_connection,
+                person_id,
+            )
+            .map_err(|err| AppError::Database(err.to_string()))?,
+        },
+        None => StoredPerson::default(),
+    };
+    check_person_save(&requester, &stored, &person).map_err(AppError::InputValidation)?;
 
     let mayerr_person_id = chimitheque_db::person::create_update_person(&mut db_connection, person);
 
@@ -198,4 +220,14 @@ pub async fn delete_person(
         Ok(()) => Ok(()),
         Err(err) => Err(AppError::Database(err.to_string())),
     }
+}
+
+/// Returns whether the person is an admin, and the entities they manage.
+fn get_requester(db_connection: &Connection, person_id: u64) -> Result<Requester, AppError> {
+    Ok(Requester {
+        is_admin: chimitheque_db::person::is_person_admin(db_connection, person_id)
+            .map_err(|err| AppError::Database(err.to_string()))?,
+        managed_entity_ids: chimitheque_db::person::managed_entity_ids(db_connection, person_id)
+            .map_err(|err| AppError::Database(err.to_string()))?,
+    })
 }
