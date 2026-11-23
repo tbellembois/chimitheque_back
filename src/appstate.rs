@@ -553,3 +553,86 @@ pub async fn init_casbin_enforcer(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+
+    // Person 1 is an admin; people 2 and 5 manage entity 6, where person 7 is
+    // a member; person 3 reads the products; person 4 reads the storages of
+    // entity 6, where storage 10 is.
+    const POLICY: &str = "p, 1, all, all, \n\
+                          p, 2, all, all, 6\n\
+                          p, 5, all, all, 6\n\
+                          p, 3, r, products, \n\
+                          p, 4, r, storages, 6\n";
+
+    fn arg1(matches: &'static [&'static str]) -> OperatorFunction {
+        OperatorFunction::Arg1Closure(Arc::new(move |id: Dynamic| {
+            matches.contains(&id.to_string().as_str()).into()
+        }))
+    }
+
+    fn arg2(matches: &'static [(&'static str, &'static str)]) -> OperatorFunction {
+        OperatorFunction::Arg2Closure(Arc::new(move |id: Dynamic, entity_id: Dynamic| {
+            matches
+                .contains(&(id.to_string().as_str(), entity_id.to_string().as_str()))
+                .into()
+        }))
+    }
+
+    fn enforcer() -> Enforcer {
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            let model = DefaultModel::from_str(include_str!("casbin/policy.conf"))
+                .await
+                .unwrap();
+            let mut enforcer = Enforcer::new(model, StringAdapter::new(POLICY))
+                .await
+                .unwrap();
+            enforcer.add_function("matchProductHasStorages", arg1(&[]));
+            enforcer.add_function("matchStoreLocationIsInEntity", arg2(&[]));
+            enforcer.add_function("matchStorageIsInEntity", arg2(&[("10", "6")]));
+            enforcer.add_function("matchStoreLocationHasChildren", arg1(&[]));
+            enforcer.add_function("matchStoreLocationHasStorages", arg1(&[]));
+            enforcer.add_function("matchPersonIsInEntity", arg2(&[("5", "6"), ("7", "6")]));
+            enforcer.add_function("matchPersonIsAdmin", arg1(&["1"]));
+            enforcer.add_function("matchPersonIsManager", arg1(&["2", "5"]));
+            enforcer.add_function("matchEntityHasMembers", arg1(&[]));
+            enforcer.add_function("matchEntityHasStoreLocations", arg1(&[]));
+            enforcer
+        })
+    }
+
+    #[test]
+    fn test_policy() {
+        let enforcer = enforcer();
+        let allowed = |person: &str, action: &str, item: &str, item_id: &str| {
+            enforcer.enforce((person, action, item, item_id)).unwrap()
+        };
+
+        // A manager updates a member of their entity, not another manager.
+        assert!(allowed("2", "u", "people", "7"));
+        assert!(!allowed("2", "u", "people", "5"));
+        // An admin updates a manager.
+        assert!(allowed("1", "u", "people", "5"));
+
+        // Reading the storages of the entity allows toggling a borrowing.
+        assert!(allowed("4", "r", "borrows", "10"));
+        assert!(allowed("4", "r", "storages", "10"));
+        assert!(!allowed("4", "u", "storages", "10"));
+        assert!(allowed("4", "r", "stocks", "1"));
+
+        // Reading the products allows bookmarks, not storages.
+        assert!(allowed("3", "r", "products", "1"));
+        assert!(allowed("3", "r", "bookmarks", "1"));
+        assert!(!allowed("3", "c", "products", ""));
+        assert!(!allowed("3", "r", "storages", ""));
+
+        // Removed rules: not checked by casbin, refused if asked.
+        for item in ["rproducts", "exportproducts", "connecteduser"] {
+            assert!(!allowed("3", "r", item, ""), "{item}");
+        }
+    }
+}
