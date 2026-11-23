@@ -371,6 +371,27 @@ async fn authenticate_middleware(
     response
 }
 
+/// The casbin items: the first path segment of the endpoints checked by the
+/// casbin policy. The other endpoints (exports, connected user, validations…)
+/// only require to be logged in.
+const PROTECTED_ITEMS: [&str; 8] = [
+    "store_locations",
+    "people",
+    "entities",
+    "stocks",
+    "products",
+    "storages",
+    "bookmarks",
+    "borrows",
+];
+
+/// Returns the casbin item of the first path segment: an `_old` endpoint
+/// returns the same data as its counterpart in another format, and is checked
+/// as it, e.g. `people_old` as `people`.
+fn casbin_item(first_segment: &str) -> &str {
+    first_segment.strip_suffix("_old").unwrap_or(first_segment)
+}
+
 // Authorize the connected user to perform the request action.
 // Use the casbin enforcer (in the state object) to check the user's permissions.
 async fn authorize_middleware(
@@ -449,22 +470,8 @@ async fn authorize_middleware(
     debug!("item_id: {}", item_id);
 
     // Check the protected endpoints.
-    if [
-        String::from("store_locations"),
-        String::from("people"),
-        String::from("entities"),
-        String::from("stocks"),
-        String::from("products"),
-        String::from("storages"),
-        String::from("pubchemautocomplete"),
-        String::from("pubchemgetcompoundbyname"),
-        String::from("pubchemgetproductbyname"),
-        String::from("pubchemproduct"),
-        String::from("bookmarks"),
-        String::from("borrows"),
-    ]
-    .contains(&item)
-    {
+    let item = casbin_item(&item).to_string();
+    if PROTECTED_ITEMS.contains(&item.as_str()) {
         let request_id = headers
             .get(REQUEST_ID_HEADER)
             .and_then(|v| v.to_str().ok())
@@ -1050,4 +1057,38 @@ pub async fn run(
         .unwrap();
 
     opentelemetry::global::shutdown_tracer_provider();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_casbin_item() {
+        assert_eq!(casbin_item("people"), "people");
+        assert_eq!(casbin_item("people_old"), "people");
+        assert_eq!(casbin_item("store_locations_old"), "store_locations");
+        assert_eq!(casbin_item("exportproducts"), "exportproducts");
+
+        // The _old endpoints are checked as their counterpart.
+        for item in [
+            "products_old",
+            "storages_old",
+            "store_locations_old",
+            "people_old",
+            "entities_old",
+        ] {
+            assert!(PROTECTED_ITEMS.contains(&casbin_item(item)), "{item}");
+        }
+        // Logged-in users only.
+        for item in [
+            "exportproducts",
+            "exportstorages",
+            "connecteduser",
+            "validate",
+            "versioninfo",
+        ] {
+            assert!(!PROTECTED_ITEMS.contains(&casbin_item(item)), "{item}");
+        }
+    }
 }
