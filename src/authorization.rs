@@ -34,6 +34,8 @@ type Grant = (PermissionName, PermissionItem, Option<u64>);
 
 /// Checks that the requester may save the person.
 ///
+/// - Admins are set at startup: the admin permission can not be given or
+///   removed, even by an admin.
 /// - Managers are set on the entities, by an admin: the saved person can not
 ///   change them.
 /// - A manager has fixed permissions: they can not be changed.
@@ -70,6 +72,13 @@ pub(crate) fn check_person_save(
         person.permissions.as_deref().unwrap_or_default(),
         &stored.managed_entity_ids,
     );
+
+    // Admins are set at startup, from the ADMINS list: the admin permission can
+    // not be given or removed by a save, even by an admin.
+    let is_admin_grant = |grant: &Grant| *grant == (PermissionName::All, PermissionItem::All, None);
+    if grants.iter().any(is_admin_grant) != stored_grants.iter().any(is_admin_grant) {
+        return Err("admins are set at startup, from the ADMINS list".to_string());
+    }
 
     if !stored.managed_entity_ids.is_empty() && !same_grants(&grants, &stored_grants) {
         return Err("the permissions of a manager can not be changed".to_string());
@@ -345,12 +354,12 @@ mod tests {
             );
         }
 
-        // An admin can.
+        // An admin can grant on any entity.
         assert!(
             check_person_save(
                 &admin(),
                 &new_person,
-                &person(vec![grant(ADMIN_GRANT)], None)
+                &person(vec![storages(Some(2))], None)
             )
             .is_ok()
         );
@@ -409,6 +418,52 @@ mod tests {
 
         // An admin can.
         assert!(check_person_save(&admin(), &stored, &with_entities(&[3])).is_ok());
+    }
+
+    #[test]
+    fn test_admin_permission_is_fixed() {
+        let admin_error = Err("admins are set at startup, from the ADMINS list".to_string());
+        let storages = permission(PermissionName::Write, PermissionItem::Storages, Some(1));
+
+        // Given to a new or an existing person, even by an admin.
+        for requester in [admin(), manager()] {
+            assert_eq!(
+                check_person_save(
+                    &requester,
+                    &StoredPerson::default(),
+                    &person(vec![grant(ADMIN_GRANT)], None)
+                ),
+                admin_error
+            );
+        }
+
+        // Removed from an admin, even by an admin.
+        let stored_admin = StoredPerson {
+            permissions: vec![grant(ADMIN_GRANT)],
+            ..Default::default()
+        };
+        assert_eq!(
+            check_person_save(
+                &admin(),
+                &stored_admin,
+                &person(vec![storages.clone()], None)
+            ),
+            admin_error
+        );
+        assert_eq!(
+            check_person_save(&admin(), &stored_admin, &Person::default()),
+            admin_error
+        );
+
+        // Kept.
+        assert!(
+            check_person_save(
+                &admin(),
+                &stored_admin,
+                &person(vec![grant(ADMIN_GRANT), storages], None)
+            )
+            .is_ok()
+        );
     }
 
     #[test]
