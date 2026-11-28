@@ -9,6 +9,7 @@ use tracing::info;
 
 use crate::{
     AppState,
+    authorization::refuse_unless_can_write_product,
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
     utils::{
@@ -154,6 +155,7 @@ pub async fn create_update_product(
         &db_connection,
         &chimitheque_db::product::product_references(&product),
     )?;
+    refuse_unless_can_write_product(&db_connection, chimitheque_person_id, &product)?;
 
     let mayerr_product_id =
         chimitheque_db::product::create_update_product(&mut db_connection, product);

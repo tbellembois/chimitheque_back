@@ -10,8 +10,9 @@ use tracing::info;
 
 use crate::{
     AppState,
-    appstate::init_casbin_enforcer,
-    authorization::{Requester, StoredPerson, check_person_save},
+    authorization::{
+        Requester, StoredPerson, check_person_save, drop_permissions_outside_entities,
+    },
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
     utils::{get_chimitheque_person_id_from_headers, refuse_if, refuse_missing_references},
@@ -170,6 +171,9 @@ pub async fn create_update_person(
         &chimitheque_db::person::person_references(&person),
     )?;
 
+    // A person removed from an entity loses its permissions.
+    drop_permissions_outside_entities(&mut person);
+
     // Managers, permissions and memberships the requester may not change.
     let requester = get_requester(&db_connection, chimitheque_person_id)?;
     let stored = match person.person_id {
@@ -183,14 +187,14 @@ pub async fn create_update_person(
             .map_err(|err| AppError::Database(err.to_string()))?,
             member_entity_ids: chimitheque_db::person::member_entity_ids(&db_connection, person_id)
                 .map_err(|err| AppError::Database(err.to_string()))?,
+            is_admin: chimitheque_db::person::is_person_admin(&db_connection, person_id)
+                .map_err(|err| AppError::Database(err.to_string()))?,
         },
         None => StoredPerson::default(),
     };
     check_person_save(&requester, &stored, &person).map_err(AppError::InputValidation)?;
 
     let mayerr_person_id = chimitheque_db::person::create_update_person(&mut db_connection, person);
-
-    init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
 
     match mayerr_person_id {
         Ok(person_id) => Ok(Json(person_id)),
@@ -215,8 +219,6 @@ pub async fn delete_person(
     // Get the connection from the database.
     let db_connection_pool = state.db_connection_pool.clone();
     let mut db_connection = db_connection_pool.get().unwrap();
-
-    init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
 
     match chimitheque_db::person::delete_person(&mut db_connection, id) {
         Ok(()) => Ok(()),

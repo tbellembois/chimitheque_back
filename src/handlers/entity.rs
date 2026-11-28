@@ -9,7 +9,6 @@ use tracing::info;
 
 use crate::{
     AppState,
-    appstate::init_casbin_enforcer,
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
     utils::{get_chimitheque_person_id_from_headers, refuse_if, refuse_missing_references},
@@ -133,8 +132,6 @@ pub async fn create_update_entity(
 
     let mayerr_entity_id = chimitheque_db::entity::create_update_entity(&mut db_connection, entity);
 
-    init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
-
     match mayerr_entity_id {
         Ok(entity_id) => Ok(Json(entity_id)),
         Err(err) => Err(AppError::Database(err.to_string())),
@@ -159,8 +156,6 @@ pub async fn delete_entity(
         chimitheque_db::entity::entity_has_store_locations(&db_connection, id),
         "the entity still has store locations",
     )?;
-
-    init_casbin_enforcer(state.casbin_enforcer, state.db_connection_pool).await?;
 
     match chimitheque_db::entity::delete_entity(&mut db_connection, id) {
         Ok(()) => Ok(()),

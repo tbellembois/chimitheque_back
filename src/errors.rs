@@ -25,10 +25,6 @@ pub enum AppError {
     ChimithequePersonIdHeaderInvalid(String),
     #[error("permission denied")]
     PermissionDenied,
-    #[error("casbin error: {0}")]
-    CasbinError(String),
-    #[error("casbin enforcer lock failed: {0}")]
-    CasbinEnforcerLockFailed(String),
     #[error("invalid person: {0}")]
     InvalidPerson(String),
     #[error("invalid product: {0}")]
@@ -120,20 +116,6 @@ impl IntoResponse for AppError {
                 (
                     StatusCode::FORBIDDEN,
                     AppError::PermissionDenied.to_string(),
-                )
-            }
-            AppError::CasbinError(err) => {
-                error!("CasbinError: {}", err);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    AppError::CasbinError(err).to_string(),
-                )
-            }
-            AppError::CasbinEnforcerLockFailed(s) => {
-                error!("CasbinEnforcerLockFailed: {}", s);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    AppError::CasbinEnforcerLockFailed(s).to_string(),
                 )
             }
             AppError::InvalidPerson(s) => {

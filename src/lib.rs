@@ -13,7 +13,8 @@ pub mod handlers;
 pub mod utils;
 
 use crate::{
-    appstate::{AppState, init_casbin_enforcer},
+    appstate::AppState,
+    authorization::{Action, Ctx, PathId, authorize},
     errors::AppError,
     handlers::{
         bookmark::toogle_bookmark,
@@ -69,7 +70,6 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{delete, get, post, put},
 };
-use casbin::{CoreApi, DefaultModel, Enforcer, NullAdapter};
 use chimitheque_db::{
     init::{create_tables, populate_db_with_base_data, sanitize},
     person::{get_admins, set_person_admin, unset_person_admin},
@@ -77,7 +77,7 @@ use chimitheque_db::{
 use chimitheque_types::{person::Person, requestfilter::RequestFilter};
 use dashmap::DashMap;
 use governor::{Quota, RateLimiter};
-use http::{HeaderValue, Method};
+use http::HeaderValue;
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use once_cell::sync::OnceCell;
 use opentelemetry::KeyValue;
@@ -371,9 +371,9 @@ async fn authenticate_middleware(
     response
 }
 
-/// The casbin items: the first path segment of the endpoints checked by the
-/// casbin policy. The other endpoints (exports, connected user, validations…)
-/// only require to be logged in.
+/// The protected items: the first path segment of the endpoints checked by
+/// `authorization::authorize`. The other endpoints (exports, connected user,
+/// validations…) only require to be logged in.
 const PROTECTED_ITEMS: [&str; 8] = [
     "store_locations",
     "people",
@@ -385,15 +385,15 @@ const PROTECTED_ITEMS: [&str; 8] = [
     "borrows",
 ];
 
-/// Returns the casbin item of the first path segment: an `_old` endpoint
-/// returns the same data as its counterpart in another format, and is checked
-/// as it, e.g. `people_old` as `people`.
-fn casbin_item(first_segment: &str) -> &str {
+/// Returns the item of the first path segment: an `_old` endpoint returns the
+/// same data as its counterpart in another format, and is checked as it, e.g.
+/// `people_old` as `people`.
+fn path_item(first_segment: &str) -> &str {
     first_segment.strip_suffix("_old").unwrap_or(first_segment)
 }
 
-// Authorize the connected user to perform the request action.
-// Use the casbin enforcer (in the state object) to check the user's permissions.
+// Authorize the connected user to perform the request action, with
+// `authorization::authorize`.
 async fn authorize_middleware(
     State(state): State<AppState>,
     id: Option<axum::extract::path::Path<String>>,
@@ -413,11 +413,8 @@ async fn authorize_middleware(
         return next.run(request).await;
     }
 
-    // Get the item ID as a string.
-    let item_id = match id {
-        Some(id) => id.to_string(),
-        None => String::new(),
-    };
+    // Get the item ID.
+    let item_id = PathId::parse(id.as_ref().map(|id| id.as_str()));
 
     // Get the chimitheque_person_id.
     let chimitheque_person_id = match get_chimitheque_person_id_from_headers(&headers) {
@@ -425,17 +422,8 @@ async fn authorize_middleware(
         Err(err) => return err.into_response(),
     };
 
-    // Get the request method.
-    let request_method = request.method();
-
     // Method <-> CRUD action match.
-    let request_action = match *request_method {
-        Method::GET => String::from("r"),
-        Method::POST => String::from("c"),
-        Method::PUT => String::from("u"),
-        Method::DELETE => String::from("d"),
-        _ => String::from("unknown"),
-    };
+    let request_action = Action::from_method(request.method());
 
     // Get the request URI.
     let request_uri = request.uri();
@@ -459,72 +447,66 @@ async fn authorize_middleware(
         .path_segments()
         .and_then(|mut segments| segments.next().map(std::string::ToString::to_string));
 
-    // Then the casbin item.
+    // Then the item.
     let Some(item) = maybe_first_segment else {
         return AppError::InvalidFirstPathSegment(maybe_first_segment).into_response();
     };
 
     debug!("chimitheque_person_id: {}", chimitheque_person_id);
-    debug!("request_action: {}", request_action);
+    debug!("request_action: {:?}", request_action);
     debug!("item: {}", item);
-    debug!("item_id: {}", item_id);
+    debug!("item_id: {:?}", item_id);
 
     // Check the protected endpoints.
-    let item = casbin_item(&item).to_string();
-    if PROTECTED_ITEMS.contains(&item.as_str()) {
+    let item = path_item(&item);
+    if PROTECTED_ITEMS.contains(&item) {
         let request_id = headers
             .get(REQUEST_ID_HEADER)
             .and_then(|v| v.to_str().ok())
             .unwrap_or("unknown");
 
         let decision_span = tracing::debug_span!(
-            "casbin.enforce",
+            "authorize",
             request_id = %request_id,
             subject = %chimitheque_person_id,
-            action = %request_action,
+            action = ?request_action,
             object = %item,
-            object_id = %item_id,
+            object_id = ?item_id,
             decision = tracing::field::Empty,
         );
-
-        // Get the casbin enforcer from the state object.
-        // TODO: https://github.com/tokio-rs/axum/discussions/2458
-        let casbin_enforcer = state.casbin_enforcer.lock().await;
-
         let _enter = decision_span.enter();
 
-        appstate::MATCHER_FAILED.store(false, std::sync::atomic::Ordering::SeqCst);
-        let decision = casbin_enforcer.enforce((
-            chimitheque_person_id.to_string(),
-            request_action,
-            item,
-            item_id,
-        ));
+        let db_connection = match state.db_connection_pool.get() {
+            Ok(db_connection) => db_connection,
+            Err(err) => return AppError::DatabasePool(err.to_string()).into_response(),
+        };
+        let ctx = Ctx {
+            db: &db_connection,
+            person_id: chimitheque_person_id,
+        };
 
-        // A failed matcher function, e.g. on an unknown id, must deny, even when
-        // negated in the policy. The failure is logged by the matcher.
-        if appstate::MATCHER_FAILED.load(std::sync::atomic::Ordering::SeqCst) {
-            decision_span.record("decision", "deny");
-            debug!("casbin deny: a matcher function failed");
-            return AppError::PermissionDenied.into_response();
-        }
+        // An unknown method is refused.
+        let decision = match request_action {
+            Some(action) => authorize(&ctx, item, action, item_id),
+            None => Ok(false),
+        };
 
         match decision {
             Ok(true) => {
                 decision_span.record("decision", "allow");
-                debug!("casbin allow");
+                debug!("allow");
             }
             Ok(false) => {
                 decision_span.record("decision", "deny");
-                debug!("casbin deny");
+                debug!("deny");
 
                 return AppError::PermissionDenied.into_response();
             }
             Err(err) => {
                 decision_span.record("decision", "error");
-                debug!(error = %err, "casbin error");
+                debug!(error = %err, "authorization error");
 
-                return AppError::CasbinError(err.to_string()).into_response();
+                return err.into_response();
             }
         }
     }
@@ -774,10 +756,6 @@ pub async fn run(
 
     let rate_limiter = RateLimiter::direct(Quota::per_second(NonZeroU32::new(5).unwrap()));
 
-    // Temporary Casbin model and adapter for state initialization.
-    let empty_casbin_model = DefaultModel::from_str("").await.unwrap();
-    let empty_casbin_adapter = NullAdapter;
-
     let state = AppState {
         db_connection_pool: Arc::new(db_connection_pool),
         rate_limiter: Arc::new(rate_limiter),
@@ -785,21 +763,7 @@ pub async fn run(
         keycloak_realm,
         keycloak_base_url,
         pkce_store: Arc::new(Mutex::new(DashMap::new())),
-        casbin_enforcer: Arc::new(Mutex::new(
-            Enforcer::new(empty_casbin_model, empty_casbin_adapter)
-                .await
-                .unwrap(),
-        )),
     };
-
-    // Initialize the state Casbin.
-    info!("initialize casbin");
-    init_casbin_enforcer(
-        state.casbin_enforcer.clone(),
-        state.db_connection_pool.clone(),
-    )
-    .await
-    .unwrap();
 
     //     requests
     //        |
@@ -1064,11 +1028,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_casbin_item() {
-        assert_eq!(casbin_item("people"), "people");
-        assert_eq!(casbin_item("people_old"), "people");
-        assert_eq!(casbin_item("store_locations_old"), "store_locations");
-        assert_eq!(casbin_item("exportproducts"), "exportproducts");
+    fn test_path_item() {
+        assert_eq!(path_item("people"), "people");
+        assert_eq!(path_item("people_old"), "people");
+        assert_eq!(path_item("store_locations_old"), "store_locations");
+        assert_eq!(path_item("exportproducts"), "exportproducts");
 
         // The _old endpoints are checked as their counterpart.
         for item in [
@@ -1078,7 +1042,7 @@ mod tests {
             "people_old",
             "entities_old",
         ] {
-            assert!(PROTECTED_ITEMS.contains(&casbin_item(item)), "{item}");
+            assert!(PROTECTED_ITEMS.contains(&path_item(item)), "{item}");
         }
         // Logged-in users only.
         for item in [
@@ -1088,7 +1052,7 @@ mod tests {
             "validate",
             "versioninfo",
         ] {
-            assert!(!PROTECTED_ITEMS.contains(&casbin_item(item)), "{item}");
+            assert!(!PROTECTED_ITEMS.contains(&path_item(item)), "{item}");
         }
     }
 }

@@ -4,13 +4,13 @@ use axum::{
     http::HeaderMap,
 };
 use axum_extra::extract::Query;
-use chimitheque_types::{permission::PermissionItem, person::Person, storage::Storage};
+use chimitheque_types::{person::Person, storage::Storage};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::{
     AppState,
-    authorization::refuse_unless_can_write_in_store_location_entity,
+    authorization::refuse_unless_can_write_storages_in,
     axumrequestfilter::AxumRequestFilter,
     errors::AppError,
     utils::{
@@ -172,10 +172,9 @@ pub async fn create_update_storage(
 
     // The storage is written in the entity of its store location.
     if let Some(store_location_id) = storage.store_location.store_location_id {
-        refuse_unless_can_write_in_store_location_entity(
+        refuse_unless_can_write_storages_in(
             &db_connection,
             chimitheque_person_id,
-            &PermissionItem::Storages,
             store_location_id,
         )?;
     }
